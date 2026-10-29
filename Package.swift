@@ -7,6 +7,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "FocusCore"),
+        .executableTarget(name: "FocusGuard", dependencies: ["FocusCore"]),
         .executableTarget(name: "focus-check", dependencies: ["FocusCore"]),
     ],
     swiftLanguageModes: [.v5]
