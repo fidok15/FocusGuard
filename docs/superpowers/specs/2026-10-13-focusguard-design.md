@@ -1,7 +1,7 @@
 # FocusGuard — Design Spec
 
 Date: 2026-10-13
-Status: approved in chat, pending written-spec review
+Status: approved; updated 2026-10-29 to match the implementation
 License: MIT
 
 ## 1. Goal
@@ -66,9 +66,11 @@ Angle/EAR/gaze thresholds live as constants in one place, marked as calibration 
 
 ### Alert rule — all must hold
 1. `focusScore` < threshold T continuously for H seconds.
-2. At least C has passed since the last bubble.
-3. Since the last alert, the score has recovered above T + 10 (hysteresis).
+2. The user is still distracted right now: under 50% focused frames in the last 2 s. A windowed score lags, so without this a distraction that already ended could still trigger a bubble.
+3. At least C has passed since the last bubble. A continuous distraction therefore gets a reminder every C, never more often.
 4. At least 60 s have passed since the study phase started (grace period).
+
+(The originally planned T + 10 hysteresis was dropped: the cooldown already prevents flapping around the threshold.)
 
 Absence: no face for > 20 s shows one "Where did you go?" bubble; the next one only after the user returns and leaves again. Absent frames count as unfocused in the score.
 
@@ -99,7 +101,10 @@ Scene objects are the controls:
 | Sticky note | Opens settings: sensitivity slider, camera preview toggle. Language follows the system. |
 | Polaroid on the wall | Optional small live camera preview (default hidden, togglable in settings). |
 
-### Layers
+### Layers (as built)
+v1 ships four complete scene illustrations (`art/scene_morning|day|sunset|night.jpeg`), one per time of day, with the cat in a different spot in each. The cat is cut out of the art with a feathered mask and animated in place (breathing, squish and hearts when petted). The timer dial and notebook pages are blank in the art and filled by SwiftUI overlays. Window: 720×402 pt. A small power button (top-right, also ⌘Q) quits the app.
+
+### Layers (original plan, superseded)
 Pre-rendered PNG layers (transparent backgrounds), composed bottom to top:
 1. `sky_morning`, `sky_day`, `sky_sunset`, `sky_night`: what is seen through the window (trees, rooftops, sky).
 2. `room`: wall, window frame, windowsill; window glass area transparent so the sky layer shows through. `room_open` variant with open window for breaks.
@@ -130,14 +135,16 @@ Frames are processed in memory and discarded. Nothing is written to disk or sent
 
 ## 8. Testing
 
-- XCTest for `FocusScorer` with synthetic signal sequences:
+- `swift run focus-check`: a plain executable self-check (no XCTest/swift-testing, so it runs with the Command Line Tools alone) feeding synthetic signal sequences to `FocusScorer`:
   - 1 s dip → 0 alerts.
-  - Standard preset: score crosses 50% after ~15 s of distraction, then must hold for H = 10 s, so 20 s distraction → 0 alerts, 30 s distraction → 1 alert (at ~25 s).
-  - long distraction → alert count bounded by cooldown C and hysteresis.
-  - blinks (< 0.5 s closures) → no distraction.
+  - Standard preset: 20 s distraction → 0 alerts, 30 s distraction → 1 alert (~25 s in).
+  - 10 min distraction → 4 alerts (cooldown 180 s).
+  - no alerts during the 60 s grace period.
+  - blinks (< 0.5 s closures) → no distraction; long eye closure → alert.
   - absence > 20 s → exactly one absence bubble.
-- XCTest for `SessionTimer` phase transitions (study → break → … → done).
-- Vision/camera/UI verified manually.
+  - sensitivity slider interpolation, `SessionClock` transitions, sleep catch-up, pause.
+- `swift run FocusGuard --snapshots <dir>` (debug builds) renders the scene in key states to PNGs for visual checks.
+- Camera/Vision verified manually.
 
 ## 9. Release
 
