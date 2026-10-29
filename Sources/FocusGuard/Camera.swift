@@ -15,10 +15,14 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private let queue = DispatchQueue(label: "FocusGuard.camera")
     private var configured = false
     private var lastFrame = 0.0
+    /// Set by start(), cleared by stop(); read on the camera queue so a late start (permission prompt,
+    /// slow device) never turns the camera on after the study phase ended.
+    private var wanted = false
 
     var isRunning: Bool { session.isRunning }
 
     func start(_ completion: @escaping (CameraStatus) -> Void) {
+        queue.async { self.wanted = true }
         let finish = { (status: CameraStatus) in DispatchQueue.main.async { completion(status) } }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
@@ -33,10 +37,14 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
 
     func stop() {
-        queue.async { if self.session.isRunning { self.session.stopRunning() } }
+        queue.async {
+            self.wanted = false
+            if self.session.isRunning { self.session.stopRunning() }
+        }
     }
 
     private func run() -> CameraStatus {
+        guard wanted else { return .off }
         if !configured {
             guard let device = AVCaptureDevice.default(for: .video),
                   let input = try? AVCaptureDeviceInput(device: device),
@@ -52,6 +60,10 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             configured = true
         }
         if !session.isRunning { session.startRunning() }
+        guard wanted else {
+            session.stopRunning()
+            return .off
+        }
         return session.isRunning ? .running : .unavailable
     }
 
@@ -59,23 +71,31 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         let now = Date().timeIntervalSinceReferenceDate
         guard now - lastFrame >= 0.1, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         lastFrame = now
-        onSignals?(FaceAnalyzer.analyze(pixels), now)
+        if let signals = FaceAnalyzer.analyze(pixels) { onSignals?(signals, now) }
     }
 }
 
 /// Apple Vision's pretrained face models -> eye openness, gaze offset and head pose.
 enum FaceAnalyzer {
-    static func analyze(_ pixels: CVPixelBuffer) -> FaceSignals {
+    /// nil when Vision failed on this frame: skip it rather than report "no face".
+    static func analyze(_ pixels: CVPixelBuffer) -> FaceSignals? {
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up)
         let rectangles = VNDetectFaceRectanglesRequest()
         rectangles.revision = VNDetectFaceRectanglesRequestRevision3
+        do { try handler.perform([rectangles]) } catch { return nil }
+        guard let pose = largest(rectangles.results) else { return .noFace }
+
+        // Landmarks only for the face already found: face detection runs once per frame.
         let landmarks = VNDetectFaceLandmarksRequest()
-        try? VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up).perform([rectangles, landmarks])
-
-        guard let face = largest(landmarks.results),
+        landmarks.inputFaceObservations = [pose]
+        do { try handler.perform([landmarks]) } catch { return nil }
+        guard let face = landmarks.results?.first,
               let marks = face.landmarks, let left = marks.leftEye, let right = marks.rightEye
-        else { return .noFace }
+        else {
+            // A face without usable eyes (turned away, occluded) is not an absent user.
+            return FaceSignals(faceFound: true, ear: 0, gazeOffset: 0, yaw: 0, pitch: 0, confidence: 0)
+        }
 
-        let pose = largest(rectangles.results) ?? face
         let degrees = 180 / Double.pi
         return FaceSignals(
             faceFound: true,

@@ -43,8 +43,9 @@ enum Bubble {
 
     /// Below our status item; falls back to the top-right corner of the main screen.
     private static func origin(for size: CGSize) -> CGPoint {
-        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let item = NSApp.windows.first { $0.className == "NSStatusBarWindow" }?.frame
+        let itemWindow = NSApp.windows.first { $0.className == "NSStatusBarWindow" }
+        let item = itemWindow?.frame
+        let screen = (itemWindow?.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let x = (item?.midX ?? screen.maxX - size.width / 2 - 12) - 34
         return CGPoint(x: min(max(x, screen.minX + 8), screen.maxX - size.width - 8),
                        y: (item?.minY ?? screen.maxY) - size.height - 2)

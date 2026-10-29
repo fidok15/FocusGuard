@@ -186,6 +186,7 @@ private struct Hotspot: View {
                 hover.value = inside
                 inside ? NSCursor.pointingHand.push() : NSCursor.pop()
             }
+            .onDisappear { if hover.value { NSCursor.pop(); hover.value = false } }
             .onTapGesture(perform: action)
             .help(help)
             .animation(.easeOut(duration: 0.15), value: hover.value)
@@ -209,6 +210,7 @@ private struct CatLayer: View {
     @StateObject private var hearts = Box<[Heart]>([])
     @StateObject private var purrs = Box(0)
     @StateObject private var lastPoint = Box<CGPoint?>(nil)
+    @StateObject private var hovering = Box(false)
     @StateObject private var stroke = Box<CGFloat>(0)
 
     private var anchor: UnitPoint { UnitPoint(x: art.cat.midX, y: art.cat.maxY) }
@@ -227,7 +229,11 @@ private struct CatLayer: View {
             }
 
             Ellipse().fill(Color.white.opacity(0.001))
-                .onHover { inside in inside ? NSCursor.openHand.push() : NSCursor.pop() }
+                .onHover { inside in
+                    hovering.value = inside
+                    inside ? NSCursor.openHand.push() : NSCursor.pop()
+                }
+                .onDisappear { if hovering.value { NSCursor.pop(); hovering.value = false } }
                 .gesture(petting)
                 .help("Pet the cat")
                 .place(art.cat)

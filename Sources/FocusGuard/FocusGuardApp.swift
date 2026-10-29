@@ -52,6 +52,7 @@ final class AppModel: ObservableObject {
     private var lastCameraRetry = Date.distantPast
     private var activity: NSObjectProtocol?
     private var timer: Timer?
+    private var alertReset: DispatchWorkItem?
 
     init() {
         let d = UserDefaults.standard
@@ -69,6 +70,14 @@ final class AppModel: ObservableObject {
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+
+        // Locked screen or sleeping display: pause instead of nudging an empty chair.
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.pauseIfStudying() }
+            }
+        }
     }
 
     // MARK: Derived state
@@ -94,7 +103,9 @@ final class AppModel: ObservableObject {
         nudges = 0
         showSetup = false
         clock.start(config, at: Date())
-        activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Study session timer")
+        // Keeps App Nap from throttling the timer without blocking idle sleep.
+        activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
+                                                         reason: "Study session timer")
         phaseChanged()
     }
 
@@ -108,6 +119,10 @@ final class AppModel: ObservableObject {
         guard clock.phase.isRunning else { return }
         if clock.isPaused { clock.resume(at: Date()) } else { clock.pause(at: Date()) }
         phaseChanged()
+    }
+
+    private func pauseIfStudying() {
+        if clock.phase.isStudy && !clock.isPaused { togglePause() }
     }
 
     func timerTapped() {
@@ -125,12 +140,12 @@ final class AppModel: ObservableObject {
         now = Date()
         if clock.tick(at: now) { phaseChanged() }
         guard clock.phase.isStudy, !clock.isPaused else { return }
-        if now.timeIntervalSince(lastSample) >= 5 {
+        if !calibrating, now.timeIntervalSince(lastSample) >= 5 {
             history.append(focus)
             lastSample = now
         }
         // Camera unplugged or busy: retry every 5 s.
-        if camera != .denied, !cameraService.isRunning, now.timeIntervalSince(lastCameraRetry) >= 5 {
+        if camera == .unavailable, now.timeIntervalSince(lastCameraRetry) >= 5 {
             lastCameraRetry = now
             startCamera()
         }
@@ -173,7 +188,10 @@ final class AppModel: ObservableObject {
         guard let event else { return }
         nudges += 1
         alerting = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in self?.alerting = false }
+        alertReset?.cancel()
+        let reset = DispatchWorkItem { [weak self] in self?.alerting = false }
+        alertReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: reset)
         Bubble.show(Lines.random(for: event), cat: timeOfDay.art.catFace)
     }
 

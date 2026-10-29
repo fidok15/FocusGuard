@@ -4,7 +4,17 @@ import AppKit
 enum MenuIcon {
     enum Mood { case sleeping, studying, alert }
 
+    /// The label refreshes every second; draw each mood once.
     static func image(_ mood: Mood) -> NSImage {
+        if let cached = cache[mood] { return cached }
+        let image = draw(mood)
+        cache[mood] = image
+        return image
+    }
+
+    private static var cache: [Mood: NSImage] = [:]
+
+    private static func draw(_ mood: Mood) -> NSImage {
         let width: CGFloat = mood == .alert ? 23 : 18
         let image = NSImage(size: NSSize(width: width, height: 18), flipped: false) { _ in
             NSColor.black.setFill()
