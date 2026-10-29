@@ -70,10 +70,15 @@ public enum Knobs {
     /// Alert only while the user is still distracted right now, not after they came back.
     public static let recentWindow = 2.0
     public static let displaySmoothing = 0.05
+    /// Baseline needs this many good frames (~3 s at 10 fps) after the calibration time.
+    public static let calibrationSamples = 30
 }
 
 /// Turns per-frame face signals into a windowed focus score and rare, non-spammy alerts.
 /// Pure logic: no camera, no UI, time passed in as seconds.
+/// One scorer covers one stretch of studying: the app creates a fresh one for every study phase and on resume,
+/// which re-runs calibration and the grace period.
+/// ponytail: the score is a frame ratio, not time-weighted; fine at the camera's fixed ~10 fps.
 public final class FocusScorer {
     public var params: ScorerParams
     public private(set) var score: Double = 100
@@ -89,6 +94,7 @@ public final class FocusScorer {
     private var absentAlerted = false
     private var belowSince: Double?
     private var lastAlert: Double?
+    private var lastFrame: Double?
 
     public init(params: ScorerParams, start: Double) {
         self.params = params
@@ -97,6 +103,14 @@ public final class FocusScorer {
 
     @discardableResult
     public func process(_ signals: FaceSignals, at t: Double) -> FocusEvent? {
+        // After a gap in frames (sleep, camera stall, long low-confidence stretch) old timers no longer mean anything.
+        if let last = lastFrame, t - last > Knobs.recentWindow {
+            belowSince = nil
+            closedSince = nil
+            absentSince = nil
+        }
+        lastFrame = t
+
         let state = classify(signals, at: t)
         guard state != .skipped else { return nil }
 
@@ -114,17 +128,24 @@ public final class FocusScorer {
             closedSince = nil
             return .absent
         }
-        absentSince = nil
+        if absentSince != nil {
+            // Back at the desk: the windowed score still lags, so don't let it count as an already-held drop.
+            absentSince = nil
+            belowSince = nil
+        }
         absentAlerted = false
-        guard s.confidence >= Knobs.minConfidence else { return .skipped }
+        guard s.confidence >= Knobs.minConfidence else {
+            closedSince = nil
+            return .skipped
+        }
 
         guard let base = baseline else {
             calibration.append(s)
-            if t - start >= Knobs.calibrationSeconds, calibration.count >= 5 {
-                let n = Double(calibration.count)
-                baseline = (calibration.map(\.yaw).reduce(0, +) / n,
-                            calibration.map(\.pitch).reduce(0, +) / n,
-                            calibration.map(\.ear).reduce(0, +) / n)
+            if t - start >= Knobs.calibrationSeconds, calibration.count >= Knobs.calibrationSamples {
+                // Median, so a glance away during calibration doesn't skew the baseline.
+                func median(_ values: [Double]) -> Double { values.sorted()[values.count / 2] }
+                baseline = (median(calibration.map(\.yaw)), median(calibration.map(\.pitch)), median(calibration.map(\.ear)))
+                calibration = []
             }
             return .focused
         }
@@ -151,6 +172,7 @@ public final class FocusScorer {
         if let since = absentSince {
             guard !absentAlerted, t - since >= Knobs.absentAlertAfter else { return nil }
             absentAlerted = true
+            // Shares the cooldown on purpose: coming back to a low score must not pop a second bubble right away.
             lastAlert = t
             return .absent
         }

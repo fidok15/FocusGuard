@@ -111,7 +111,87 @@ func pauseFreezesRemainingTime() {
     check(clock.phase == .done)
 }
 
+func noInstantAlertAfterFrameGap() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    var events: [FocusEvent] = []
+    for i in 0...1000 { let t = Double(i) / fps; if let e = scorer.process(look, at: t) { events.append(e) } }
+    // 5 minutes of nothing (Mac asleep), score window still remembers a drop
+    for i in 0...300 { let t = 100 + Double(i) / fps; if let e = scorer.process(away, at: t) { events.append(e) } }
+    events = []
+    if let e = scorer.process(away, at: 500) { events.append(e) }
+    check(events.isEmpty)
+}
+
+func delayedCalibrationStillWorks() {
+    // No face for the first 15 s (absence alert isn't due yet at 20 s), then normal, then a real distraction.
+    let events = run(until: 200) { t in t < 15 ? .noFace : ((100..<130).contains(t) ? away : look) }
+    check(events == [.lowFocus])
+}
+
+func calibrationUsesMedian() {
+    // Looking away for 2 s while calibrating must not shift the baseline.
+    let events = run(until: 200) { t in (3..<5).contains(t) ? away : look }
+    check(events.isEmpty)
+}
+
+func lowConfidenceFramesAreIgnored() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    var blurry = away
+    blurry.confidence = 0.05
+    for i in 0...2000 {
+        let t = Double(i) / fps
+        check(scorer.process(t > 60 ? blurry : look, at: t) == nil)
+    }
+    check(scorer.score == 100)
+}
+
+func absenceAlertsAgainAfterReturning() {
+    let events = run(until: 600) { t in (100..<130).contains(t) || (400..<430).contains(t) ? .noFace : look }
+    check(events == [.absent, .absent])
+}
+
+func returningFromAbsenceNeedsFreshHold() {
+    // Away 60 s (absent bubble), back, then a 3 s glance: no extra low-focus bubble.
+    let events = run(until: 400) { t in (100..<160).contains(t) ? .noFace : ((370..<373).contains(t) ? away : look) }
+    check(events == [.absent])
+}
+
+func singleRoundGoesStraightToDone() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 1), at: t0)
+    clock.tick(at: t0 + 25 * 60)
+    check(clock.phase == .done)
+}
+
+func pauseAfterMissedPhaseCatchesUp() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 2), at: t0)
+    clock.pause(at: t0 + 27 * 60)
+    check(clock.phase == .rest(round: 1))
+    check(clock.remaining(at: t0 + 99 * 60) == 3 * 60)
+}
+
+func zeroConfigIsClamped() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 0, breakMinutes: 0, rounds: 0), at: t0)
+    check(clock.config == SessionConfig(studyMinutes: 1, breakMinutes: 1, rounds: 1))
+    clock.tick(at: t0 + 1_000_000)
+    check(clock.phase == .done)
+}
+
 let checks: [(String, () -> Void)] = [
+    ("noInstantAlertAfterFrameGap", noInstantAlertAfterFrameGap),
+    ("delayedCalibrationStillWorks", delayedCalibrationStillWorks),
+    ("calibrationUsesMedian", calibrationUsesMedian),
+    ("lowConfidenceFramesAreIgnored", lowConfidenceFramesAreIgnored),
+    ("absenceAlertsAgainAfterReturning", absenceAlertsAgainAfterReturning),
+    ("returningFromAbsenceNeedsFreshHold", returningFromAbsenceNeedsFreshHold),
+    ("singleRoundGoesStraightToDone", singleRoundGoesStraightToDone),
+    ("pauseAfterMissedPhaseCatchesUp", pauseAfterMissedPhaseCatchesUp),
+    ("zeroConfigIsClamped", zeroConfigIsClamped),
     ("oneSecondDipNeverAlerts", oneSecondDipNeverAlerts),
     ("twentySecondDistractionDoesNotAlert", twentySecondDistractionDoesNotAlert),
     ("thirtySecondDistractionAlertsOnce", thirtySecondDistractionAlertsOnce),

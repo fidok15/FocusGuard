@@ -46,7 +46,9 @@ public struct SessionClock: Sendable {
     }
 
     public mutating func start(_ config: SessionConfig, at now: Date) {
-        self.config = config
+        self.config = SessionConfig(studyMinutes: max(1, config.studyMinutes),
+                                    breakMinutes: max(1, config.breakMinutes),
+                                    rounds: max(1, config.rounds))
         pausedRemaining = nil
         enter(.study(round: 1), at: now)
     }
@@ -55,9 +57,11 @@ public struct SessionClock: Sendable {
         phase = .idle
         phaseEnd = nil
         pausedRemaining = nil
+        phaseDuration = 0
     }
 
     public mutating func pause(at now: Date) {
+        tick(at: now) // catch up on phases that ended while asleep
         guard phase.isRunning, !isPaused else { return }
         pausedRemaining = remaining(at: now)
     }
