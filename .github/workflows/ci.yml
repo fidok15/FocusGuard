@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-check
+        run: swift run focus-check
+      - name: Build app
+        run: scripts/build-app.sh
+      - name: Zip
+        run: ditto -c -k --keepParent dist/FocusGuard.app dist/FocusGuard.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FocusGuard
+          path: dist/FocusGuard.zip
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/FocusGuard.zip --generate-notes

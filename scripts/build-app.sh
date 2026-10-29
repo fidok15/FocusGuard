@@ -10,6 +10,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
 cp "$(swift build -c release --show-bin-path)/FocusGuard" "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/"
+cp Resources/AppIcon.icns "$app/Contents/Resources/"
 cp -R Resources/en.lproj Resources/pl.lproj "$app/Contents/Resources/"
 for scene in morning day sunset night; do
     # 1600 px wide is plenty for a 720 pt window on Retina.
