@@ -2,7 +2,7 @@
 
 # FocusGuard
 
-A cozy lofi study timer that lives in your Mac's menu bar. While you study, it uses the webcam and Apple's on-device face models to estimate your focus. When your focus drops for real, not for a second, the cat gives you a gentle nudge.
+A cozy lofi study timer that lives in your Mac's menu bar. While you study, it uses the webcam and Apple's on-device face models to estimate your focus. When your focus drops for real, not for a second, you get a gentle nudge.
 
 ![FocusGuard while studying](docs/screenshots/study.jpg)
 
@@ -12,7 +12,7 @@ A cozy lofi study timer that lives in your Mac's menu bar. While you study, it u
 
 ## Features
 
-- **Menu bar app.** Click the cat in the menu bar to open a hand-drawn desk scene. The time of day outside the window follows your clock: morning, day, sunset, or night.
+- **Menu bar app.** Click the timer icon in the menu bar to open a hand-drawn desk scene. The time of day outside the window follows your clock: morning, day, sunset, or night.
 - **Pomodoro timer.** Click the kitchen timer on the desk, then set study length, break length, and rounds in the notebook.
 - **Focus estimate.** During study phases the camera measures eye openness, gaze, and head pose. The notebook shows your focus percentage and a pencil-drawn chart.
 - **No spam.** A nudge needs a sustained drop. A one-second dip never triggers one, and a cooldown keeps reminders rare. Sensitivity is one slider (the sticky note).
@@ -33,7 +33,7 @@ Camera frames are analyzed in memory on your Mac with Apple's Vision framework, 
    - **macOS 14:** right-click the app, choose **Open**, and confirm.
    - Or remove the download quarantine in Terminal: `xattr -dr com.apple.quarantine /Applications/FocusGuard.app`
    - Or build it yourself (below). Local builds don't get this warning.
-4. Look for the cat in the menu bar. The app has no Dock icon or window of its own.
+4. Look for the timer icon in the menu bar. The app has no Dock icon or window of its own.
 5. Allow camera access when you start your first study session. If you denied it, enable FocusGuard in **System Settings › Privacy & Security › Camera**. The timer works without the camera, but focus tracking won't.
 
 To quit, use the ⏻ button in the top-right corner of the scene, or press ⌘Q while it's open.

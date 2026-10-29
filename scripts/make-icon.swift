@@ -1,4 +1,4 @@
-// Renders Resources/AppIcon.icns from the morning scene: the sleeping cat on the windowsill.
+// Renders Resources/AppIcon.icns from the morning scene: the study timer (with a focus wedge) and notebook.
 // Usage, from the repo root: swift scripts/make-icon.swift   (needs iconutil, part of the Command Line Tools)
 import AppKit
 
@@ -6,10 +6,34 @@ let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: "art/scene_morning.
 let art = CGImageSourceCreateImageAtIndex(source, 0, nil)!
 let pw = CGFloat(art.width), ph = CGFloat(art.height)
 
-// Square around the cat (measured on the 2000×1116 preview of the art).
-let side = 0.23 * pw
-let center = CGPoint(x: 1010.0 / 2000 * pw, y: 470.0 / 1116 * ph)
-let crop = art.cropping(to: CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side))!
+// Square around the kitchen timer and the open notebook (measured on the 2000×1116 preview of the art).
+let side = 0.165 * pw
+let center = CGPoint(x: 475.0 / 2000 * pw, y: 750.0 / 1116 * ph)
+let cropRect = CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)
+let plain = art.cropping(to: cropRect)!
+
+// Paint the red focus wedge on the timer's blank dial, like the app does while you study.
+let crop: CGImage = {
+    let w = plain.width, h = plain.height
+    let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    ctx.draw(plain, in: CGRect(x: 0, y: 0, width: w, height: h))
+    let dial = CGPoint(x: 470.0 / 2000 * pw - cropRect.minX, y: 735.0 / 1116 * ph - cropRect.minY)
+    let c = CGPoint(x: dial.x, y: CGFloat(h) - dial.y) // CG origin is bottom-left
+    let r = 52.0 / 2000 * pw * 0.82
+    ctx.move(to: c)
+    ctx.addArc(center: c, radius: r, startAngle: .pi / 2, endAngle: .pi / 2 - 2 * .pi * 0.7, clockwise: true)
+    ctx.closePath()
+    ctx.setFillColor(red: 0.86, green: 0.3, blue: 0.27, alpha: 0.85)
+    ctx.fillPath()
+    let end = CGFloat.pi / 2 - 2 * .pi * 0.7
+    ctx.move(to: c)
+    ctx.addLine(to: CGPoint(x: c.x + cos(end) * r, y: c.y + sin(end) * r))
+    ctx.setStrokeColor(red: 0.24, green: 0.2, blue: 0.18, alpha: 1)
+    ctx.setLineWidth(r * 0.08)
+    ctx.strokePath()
+    return ctx.makeImage()!
+}()
 
 func render(_ size: Int) -> Data {
     let s = CGFloat(size)

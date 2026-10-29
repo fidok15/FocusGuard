@@ -1,8 +1,9 @@
 import AppKit
 
-/// Hand-drawn cat head for the menu bar, as a template image so it follows the light/dark menu bar.
+/// Kitchen-timer glyph for the menu bar, as a template image so it follows the light/dark menu bar.
+/// Idle: empty dial. Studying: a focus wedge. Alert: wedge plus "!".
 enum MenuIcon {
-    enum Mood { case sleeping, studying, alert }
+    enum Mood { case idle, studying, alert }
 
     /// The label refreshes every second; draw each mood once.
     static func image(_ mood: Mood) -> NSImage {
@@ -20,34 +21,35 @@ enum MenuIcon {
             NSColor.black.setFill()
             NSColor.black.setStroke()
 
-            // Filled separately so opposite winding never punches holes where ears meet the head.
-            NSBezierPath(ovalIn: NSRect(x: 1.5, y: 1.5, width: 15, height: 12)).fill()
-            ear([CGPoint(x: 2.6, y: 8.5), CGPoint(x: 3.8, y: 16.6), CGPoint(x: 8.2, y: 12.6)]).fill()
-            ear([CGPoint(x: 9.8, y: 12.6), CGPoint(x: 14.2, y: 16.6), CGPoint(x: 15.4, y: 8.5)]).fill()
+            // Timer body with a knob on top.
+            let body = NSBezierPath(roundedRect: NSRect(x: 1.5, y: 1, width: 15, height: 14), xRadius: 4, yRadius: 4)
+            body.lineWidth = 1.6
+            body.stroke()
+            NSBezierPath(roundedRect: NSRect(x: 7, y: 15, width: 4, height: 2.2), xRadius: 1, yRadius: 1).fill()
 
-            // Eyes and nose are cut out of the silhouette.
-            NSGraphicsContext.current?.compositingOperation = .destinationOut
-            switch mood {
-            case .sleeping:
-                for x in [5.6, 12.4] {
-                    let lid = NSBezierPath()
-                    lid.appendArc(withCenter: CGPoint(x: x, y: 8.4), radius: 1.7, startAngle: 200, endAngle: 340)
-                    lid.lineWidth = 1.3
-                    lid.lineCapStyle = .round
-                    lid.stroke()
-                }
-            case .studying, .alert:
-                for x in [5.6, 12.4] {
-                    NSBezierPath(ovalIn: NSRect(x: x - 1.2, y: 6.4, width: 2.4, height: 3.2)).fill()
-                }
+            // Dial.
+            let center = CGPoint(x: 9, y: 8)
+            let dial = NSBezierPath(ovalIn: NSRect(x: center.x - 4.6, y: center.y - 4.6, width: 9.2, height: 9.2))
+            dial.lineWidth = 1.1
+            dial.stroke()
+
+            if mood == .idle {
+                let hand = NSBezierPath()
+                hand.move(to: center)
+                hand.line(to: CGPoint(x: center.x + 2.9, y: center.y + 1.7)) // pointing at 2 o'clock, unlike a power glyph
+                hand.move(to: CGPoint(x: center.x, y: center.y + 3.6))
+                hand.line(to: CGPoint(x: center.x, y: center.y + 2.6)) // 12 o'clock tick
+                hand.lineWidth = 1.3
+                hand.lineCapStyle = .round
+                hand.stroke()
+            } else {
+                // Focus wedge: from 12 o'clock, clockwise, two thirds of the dial.
+                let wedge = NSBezierPath()
+                wedge.move(to: center)
+                wedge.appendArc(withCenter: center, radius: 3.6, startAngle: 90, endAngle: -150, clockwise: true)
+                wedge.close()
+                wedge.fill()
             }
-            let nose = NSBezierPath()
-            nose.move(to: CGPoint(x: 8.1, y: 5.6))
-            nose.line(to: CGPoint(x: 9.9, y: 5.6))
-            nose.line(to: CGPoint(x: 9, y: 4.5))
-            nose.close()
-            nose.fill()
-            NSGraphicsContext.current?.compositingOperation = .sourceOver
 
             if mood == .alert {
                 NSBezierPath(roundedRect: NSRect(x: 19.6, y: 6.4, width: 2.2, height: 9.6), xRadius: 1.1, yRadius: 1.1).fill()
@@ -57,14 +59,5 @@ enum MenuIcon {
         }
         image.isTemplate = true
         return image
-    }
-
-    private static func ear(_ points: [CGPoint]) -> NSBezierPath {
-        let path = NSBezierPath()
-        path.move(to: points[0])
-        points.dropFirst().forEach { path.line(to: $0) }
-        path.close()
-        path.lineJoinStyle = .round
-        return path
     }
 }
