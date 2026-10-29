@@ -1,5 +1,5 @@
 // Renders Resources/AppIcon.icns from the morning scene: the sleeping cat on the windowsill.
-// Usage: swift scripts/make-icon.swift   (needs iconutil, part of the Command Line Tools)
+// Usage, from the repo root: swift scripts/make-icon.swift   (needs iconutil, part of the Command Line Tools)
 import AppKit
 
 let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: "art/scene_morning.jpeg") as CFURL, nil)!

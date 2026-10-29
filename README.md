@@ -28,8 +28,15 @@ Camera frames are analyzed in memory on your Mac with Apple's Vision framework, 
 
 1. Download `FocusGuard.zip` from [Releases](../../releases) and unzip it.
 2. Move `FocusGuard.app` to Applications.
-3. The app is not notarized, so the first time you open it, right-click it, choose **Open**, and confirm.
-4. Allow camera access when asked.
+3. Open it. The app is free and open source but not notarized by Apple, so macOS blocks the first launch:
+   - **macOS 15 Sequoia and later:** after the warning, open **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to FocusGuard.
+   - **macOS 14:** right-click the app, choose **Open**, and confirm.
+   - Or remove the download quarantine in Terminal: `xattr -dr com.apple.quarantine /Applications/FocusGuard.app`
+   - Or build it yourself (below). Local builds don't get this warning.
+4. Look for the cat in the menu bar. The app has no Dock icon or window of its own.
+5. Allow camera access when you start your first study session. If you denied it, enable FocusGuard in **System Settings › Privacy & Security › Camera**. The timer works without the camera, but focus tracking won't.
+
+To quit, use the ⏻ button in the top-right corner of the scene, or press ⌘Q while it's open.
 
 Requires macOS 14 or later.
 
@@ -46,8 +53,8 @@ open dist/FocusGuard.app
 Developer extras:
 
 ```sh
-swift run FocusGuard --snapshots /tmp/fg   # render the scene in key states to PNGs
-swift scripts/make-icon.swift              # regenerate Resources/AppIcon.icns from the art
+swift run FocusGuard --snapshots /tmp/fg   # render the scene in key states to PNGs (debug builds only)
+swift scripts/make-icon.swift              # regenerate Resources/AppIcon.icns from the art (run from the repo root)
 ```
 
 ## How the focus score works

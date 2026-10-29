@@ -6,6 +6,9 @@ on:
     tags: ["v*"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: macos-15
@@ -13,6 +16,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Self-check
         run: swift run focus-check
+      - name: Tag matches app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Resources/Info.plist)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME != Info.plist v$version"; exit 1; }
       - name: Build app
         run: scripts/build-app.sh
       - name: Zip
@@ -21,8 +29,18 @@ jobs:
         with:
           name: FocusGuard
           path: dist/FocusGuard.zip
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FocusGuard
+      - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/FocusGuard.zip --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" FocusGuard.zip --repo "$GITHUB_REPOSITORY" --generate-notes
