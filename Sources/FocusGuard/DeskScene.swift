@@ -315,23 +315,28 @@ private struct Steam: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30)) { context in
             Canvas { ctx, size in
-                let t = context.date.timeIntervalSinceReferenceDate
-                ctx.addFilter(.blur(radius: 2.5))
-                for i in 0..<3 {
-                    let phase = (t * 0.22 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                    let baseX = size.width * (0.32 + 0.16 * Double(i))
-                    var path = Path()
-                    for k in 0...24 {
-                        let f = phase * 0.55 + Double(k) / 24 * 0.45 // segment of the column, rising with phase
-                        let y = size.height * (1 - f)
-                        let x = baseX + sin(f * 7 + t * 1.3 + Double(i) * 2.1) * size.width * 0.16 * f
-                        k == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
-                    }
-                    let alpha = sin(phase * .pi) * 0.5
-                    ctx.stroke(path, with: .color(.white.opacity(alpha)),
-                               style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                }
+                Self.draw(in: &ctx, size: size, time: context.date.timeIntervalSinceReferenceDate)
             }
+        }
+    }
+
+    // Kept out of the view builder with explicit types: older compilers time out type-checking it inline.
+    private static func draw(in ctx: inout GraphicsContext, size: CGSize, time t: Double) {
+        ctx.addFilter(.blur(radius: 2.5))
+        let w = Double(size.width), h = Double(size.height)
+        for i in 0..<3 {
+            let n = Double(i)
+            let phase: Double = (t * 0.22 + n / 3).truncatingRemainder(dividingBy: 1)
+            let baseX: Double = w * (0.32 + 0.16 * n)
+            var path = Path()
+            for k in 0...24 {
+                let f: Double = phase * 0.55 + Double(k) / 24 * 0.45 // segment of the column, rising with phase
+                let wobble: Double = sin(f * 7 + t * 1.3 + n * 2.1) * w * 0.16 * f
+                let point = CGPoint(x: baseX + wobble, y: h * (1 - f))
+                if k == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+            let alpha: Double = sin(phase * .pi) * 0.5
+            ctx.stroke(path, with: .color(.white.opacity(alpha)), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
         }
     }
 }
