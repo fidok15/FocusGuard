@@ -8,18 +8,19 @@ struct QuitButton: View {
     var body: some View {
         Button { NSApp.terminate(nil) } label: {
             ZStack {
-                WashiTape(width: 52, height: 16)
+                WashiTape(width: 64, height: 20)
                 Path { p in
-                    p.move(to: CGPoint(x: -3.5, y: -3)); p.addLine(to: CGPoint(x: 3.2, y: 3.6))
-                    p.move(to: CGPoint(x: 3.5, y: -3.2)); p.addLine(to: CGPoint(x: -3.3, y: 3.4))
+                    p.move(to: CGPoint(x: -4.5, y: -4)); p.addLine(to: CGPoint(x: 4.2, y: 4.6))
+                    p.move(to: CGPoint(x: 4.6, y: -4.2)); p.addLine(to: CGPoint(x: -4.3, y: 4.4))
                 }
-                .stroke(Ink.pencil, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                .stroke(Ink.pencil, style: StrokeStyle(lineWidth: hover.value ? 2.2 : 1.8, lineCap: .round))
                 .rotationEffect(.degrees(-45))
             }
             .contentShape(Rectangle())
             .rotationEffect(.degrees(45))
             .scaleEffect(hover.value ? 1.1 : 1)
-            .brightness(hover.value ? 0.05 : 0)
+            .brightness(hover.value ? 0.06 : 0)
+            .shadow(color: .black.opacity(hover.value ? 0.35 : 0.2), radius: hover.value ? 3 : 1.5, y: 1)
         }
         .buttonStyle(PressStyle())
         .keyboardShortcut("q")
@@ -83,30 +84,30 @@ struct SettingsNote: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Settings").font(Ink.hand(13))
+            Text("settings").font(Ink.hand(13))
                 .overlay(alignment: .bottom) { WavyLine(seed: 3).stroke(Ink.pencil.opacity(0.8), lineWidth: 1).frame(height: 3).offset(y: 3) }
                 .padding(.bottom, 4)
-            Text("Alert sensitivity").font(Ink.hand(11))
+            Text("alert sensitivity").font(Ink.hand(11))
             HandSlider(value: $model.sensitivity)
             HStack {
                 Text("gentle")
                 Spacer()
                 Text("sensitive")
-            }.font(Ink.hand(9))
-            BoxChoice(title: "Camera preview", checked: model.showPreview) { model.showPreview.toggle() }
+            }.font(Ink.hand(11))
+            BoxChoice(title: "camera preview", checked: model.showPreview) { model.showPreview.toggle() }
                 .padding(.top, 4)
             WordLink(title: "close the app", size: 11, underlined: true) { NSApp.terminate(nil) }
         }
         .foregroundStyle(Ink.pencil)
-        .padding(.horizontal, 14).padding(.top, 16).padding(.bottom, 14)
+        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 12)
         .frame(width: 190, alignment: .leading)
         .background {
             CurledNote()
-                .fill(LinearGradient(colors: [Ink.sticky.opacity(0.93), Ink.sticky], startPoint: .top, endPoint: .bottom))
+                .fill(LinearGradient(colors: [Color(red: 0.98, green: 0.91, blue: 0.52), Ink.sticky], startPoint: .top, endPoint: .bottom))
                 .shadow(color: .black.opacity(0.3), radius: 5, x: 1, y: 3)
         }
         .overlay(alignment: .bottomTrailing) {
-            Flap().fill(LinearGradient(colors: [Ink.sticky.opacity(0.7), Color(red: 0.8, green: 0.7, blue: 0.3)],
+            Flap().fill(LinearGradient(colors: [Color(red: 0.9, green: 0.82, blue: 0.4), Color(red: 0.8, green: 0.7, blue: 0.3)],
                                        startPoint: .topTrailing, endPoint: .bottomLeading))
                 .frame(width: 14, height: 14).shadow(color: .black.opacity(0.25), radius: 1.5, x: -1, y: -1)
         }

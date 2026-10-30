@@ -276,7 +276,7 @@ enum DebugWindow {
             model.start()
             model.cameraService.stop()
             model.camera = .running
-            model.history = [92, 88, 85, 70, 55, 62, 78, 84, 90, 87]
+            model.history = [94, 90, 84, 66, 48, 58, 76, 88, 72, 52, 64, 82, 91, 86]
             model.focus = 82
             model.calibrating = false
             model.now = t0.addingTimeInterval(7 * 60)
@@ -322,7 +322,7 @@ enum Snapshots {
         model.start()
         model.cameraService.stop()
         model.camera = .running
-        model.history = [92, 88, 85, 70, 55, 62, 78, 84, 90, 87]
+        model.history = [94, 90, 84, 66, 48, 58, 76, 88, 72, 52, 64, 82, 91, 86]
         model.focus = 82
         model.calibrating = false
         model.now = t0.addingTimeInterval(7 * 60)

@@ -36,6 +36,7 @@ extension View {
 enum Ink {
     static let pencil = Color(red: 0.227, green: 0.208, blue: 0.188)
     static let line = Color(red: 0.36, green: 0.24, blue: 0.16)
+    static let page = Color(red: 0.98, green: 0.945, blue: 0.84) // notebook page tone, sampled from the art
     static let paper = Color(red: 1, green: 0.97, blue: 0.9)
     static let sticky = Color(red: 0.965, green: 0.886, blue: 0.478)
     static let red = Color(red: 0.824, green: 0.318, blue: 0.247)
@@ -59,8 +60,10 @@ struct SceneArt {
     let cat: CGRect
     let head: CGPoint
     let headRadius: CGFloat
+    var silhouette: [CGPoint] = []
 
-    init(url: URL?, cat: CGRect, head: CGPoint, headRadius: CGFloat) {
+    init(url: URL?, cat: CGRect, head: CGPoint, headRadius: CGFloat, silhouette: [CGPoint] = []) {
+        self.silhouette = silhouette
         self.url = url
         self.image = url.flatMap(NSImage.init(contentsOf:))
         self.cat = cat
@@ -103,13 +106,13 @@ enum TimeOfDay: CaseIterable {
 
     private static let arts: [TimeOfDay: SceneArt] = [
         .morning: SceneArt(url: SceneArt.locate("scene_morning"), cat: R(815, 425, 405, 180),
-                           head: CGPoint(x: 905.0 / 2000, y: 512.0 / 1116), headRadius: 0.035),
+                           head: CGPoint(x: 905.0 / 2000, y: 512.0 / 1116), headRadius: 0.035, silhouette: Silhouette.catMorning),
         .day: SceneArt(url: SceneArt.locate("scene_day"), cat: R(1715, 495, 285, 270),
-                       head: CGPoint(x: 1785.0 / 2000, y: 560.0 / 1116), headRadius: 0.035),
+                       head: CGPoint(x: 1785.0 / 2000, y: 560.0 / 1116), headRadius: 0.035, silhouette: Silhouette.catDay),
         .sunset: SceneArt(url: SceneArt.locate("scene_sunset"), cat: R(1305, 265, 240, 350),
-                          head: CGPoint(x: 1420.0 / 2000, y: 320.0 / 1116), headRadius: 0.033),
+                          head: CGPoint(x: 1420.0 / 2000, y: 320.0 / 1116), headRadius: 0.033, silhouette: Silhouette.catSunset),
         .night: SceneArt(url: SceneArt.locate("scene_night"), cat: R(40, 750, 505, 265),
-                         head: CGPoint(x: 445.0 / 2000, y: 860.0 / 1116), headRadius: 0.038),
+                         head: CGPoint(x: 445.0 / 2000, y: 860.0 / 1116), headRadius: 0.038, silhouette: Silhouette.catNight),
     ]
 }
 
@@ -136,9 +139,9 @@ struct DeskScene: View {
             Steam().place(Spots.steam).allowsHitTesting(false)
             TimerFace().place(Spots.dial).allowsHitTesting(false)
 
-            Hotspot(rect: Spots.timer, help: "Set study time", action: model.timerTapped)
-            Hotspot(rect: Spots.mug, help: "Pause / resume", action: model.togglePause)
-            Hotspot(rect: Spots.stickyNotes, help: "Settings") {
+            Hotspot(name: "timer", groups: [Silhouette.timer], help: "Set study time", action: model.timerTapped)
+            Hotspot(name: "mug", groups: [Silhouette.mug], help: "Pause / resume", action: model.togglePause)
+            Hotspot(name: "sticky", groups: [Silhouette.pinkNote, Silhouette.greenNote], smooth: false, help: "Settings") {
                 model.showSettings.toggle()
                 model.showSetup = false
             }
@@ -150,12 +153,12 @@ struct DeskScene: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
-            QuitButton().position(x: W - 17, y: 17)
+            QuitButton().position(x: W - 21, y: 21)
 
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
                 SettingsNote()
-                    .position(x: W * 0.79, y: H * 0.625)
+                    .position(x: W * 0.8, y: H * 0.755)
                     .transition(.scale(scale: 0.8, anchor: .bottomTrailing).combined(with: .opacity))
             }
         }
@@ -170,28 +173,30 @@ struct DeskScene: View {
     }
 }
 
-/// Invisible clickable area over an object in the art, with a soft glow on hover.
+/// Invisible clickable area shaped exactly like an object in the art, with a soft glow on hover.
 private struct Hotspot: View {
-    let rect: CGRect
+    let name: String
+    let groups: [[CGPoint]]
+    var smooth = true
     let help: LocalizedStringKey
     let action: () -> Void
     @StateObject private var hover = Box(false)
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Color.white.opacity(hover.value ? 0.12 : 0.001))
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(hover.value ? 0.6 : 0), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
-            .contentShape(Rectangle())
-            .onHover { inside in
-                hover.value = inside
-                inside ? NSCursor.pointingHand.push() : NSCursor.pop()
-            }
-            .onDisappear { if hover.value { NSCursor.pop(); hover.value = false } }
-            .onTapGesture(perform: action)
-            .help(help)
-            .animation(.easeOut(duration: 0.15), value: hover.value)
-            .place(rect)
+        let shape = OutlineShape(groups: groups, smooth: smooth)
+        ZStack {
+            HoverGlow(shape: shape, on: hover.value || forcedHover?.contains(name) == true)
+            shape.fill(Color.white.opacity(0.001))
+        }
+        .frame(width: W, height: H)
+        .contentShape(shape)
+        .onHover { inside in
+            hover.value = inside
+            inside ? NSCursor.pointingHand.push() : NSCursor.pop()
+        }
+        .onDisappear { if hover.value { NSCursor.pop(); hover.value = false } }
+        .onTapGesture(perform: action)
+        .help(help)
     }
 }
 
@@ -215,6 +220,7 @@ private struct CatLayer: View {
     @StateObject private var hovering = Box(false)
     @StateObject private var stroke = Box<CGFloat>(0)
 
+    private var catShape: OutlineShape { OutlineShape(groups: [art.silhouette]) }
     private var anchor: UnitPoint { UnitPoint(x: art.cat.midX, y: art.cat.maxY) }
 
     /// Damped bounce after a pet: positive = squashed.
@@ -239,7 +245,8 @@ private struct CatLayer: View {
                 .allowsHitTesting(false)
             }
 
-            Ellipse().fill(Color.white.opacity(0.001))
+            HoverGlow(shape: catShape, on: hovering.value || forcedHover?.contains("cat") == true)
+            catShape.fill(Color.white.opacity(0.001))
                 .onHover { inside in
                     hovering.value = inside
                     inside ? NSCursor.openHand.push() : NSCursor.pop()
@@ -247,7 +254,6 @@ private struct CatLayer: View {
                 .onDisappear { if hovering.value { NSCursor.pop(); hovering.value = false } }
                 .gesture(petting)
                 .help("Pet the cat")
-                .place(art.cat)
 
             if !pets.value.isEmpty {
                 TimelineView(.animation(minimumInterval: 1 / 30)) { context in
@@ -317,12 +323,16 @@ private struct PetEffects: View {
             if let last = pets.last {
                 let age = now.timeIntervalSince(last.born)
                 let a = min(age / 0.15, 1) * min(max((1.6 - age) / 0.4, 0), 1)
-                Text("prrr~ ♡")
-                    .font(Ink.hand(13))
-                    .foregroundStyle(.white)
-                    .shadow(color: Ink.pencil, radius: 0.5).shadow(color: Ink.pencil.opacity(0.7), radius: 1.5)
+                Text("prrr~")
+                    .font(Ink.hand(12))
+                    .foregroundStyle(Ink.pencil)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Ink.page, in: RoundedRectangle(cornerRadius: 1.5))
+                    .overlay(RoundedRectangle(cornerRadius: 1.5).stroke(Ink.pencil.opacity(0.5), lineWidth: 0.6))
+                    .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+                    .rotationEffect(.degrees(-4))
                     .opacity(a)
-                    .position(x: head.x * W + 26, y: head.y * H - 30 - CGFloat(min(age, 1)) * 4)
+                    .position(x: head.x * W + 48, y: head.y * H - 58 - CGFloat(min(age, 1)) * 4)
             }
         }
         .frame(width: W, height: H, alignment: .topLeading)

@@ -1,6 +1,7 @@
 "Set study time" = "Ustaw czas nauki";
 "Pause / resume" = "Pauza / wznów";
 "Settings" = "Ustawienia";
+"settings" = "ustawienia";
 "Pet the cat" = "Pogłaszcz kota";
 "stop session?" = "zakończyć sesję?";
 "yes" = "tak";
@@ -16,7 +17,7 @@
 "average focus" = "średnie skupienie";
 "nudges: %lld" = "przypomnienia: %lld";
 "new session" = "nowa sesja";
-"Tap the timer" = "Kliknij minutnik,";
+"tap the timer" = "kliknij minutnik,";
 "to start studying" = "żeby zacząć naukę";
 "focus" = "skupienie";
 "camera is off" = "kamera wyłączona";
@@ -28,13 +29,13 @@
 "starting camera…" = "włączam kamerę…";
 "calibrating, look at the screen…" = "kalibracja, patrz na ekran…";
 "camera on, stays on this Mac" = "kamera włączona, obraz zostaje na Macu";
-"Alert sensitivity" = "Czułość przypomnień";
+"alert sensitivity" = "czułość przypomnień";
 "gentle" = "łagodnie";
 "sensitive" = "czule";
-"Camera preview" = "Podgląd kamery";
+"camera preview" = "podgląd kamery";
 "close the app" = "zamknij aplikację";
 "Quit FocusGuard" = "Zamknij FocusGuard";
-"prrr~ ♡" = "mrrr~ ♡";
+"prrr~" = "mrrr~";
 "Where did you go? The cat is waiting~" = "Gdzie jesteś? Kot czeka~";
 "Hello? Your notebook misses you!" = "Halo? Zeszyt tęskni!";
 "Hey! Your focus is slipping~" = "Hej! Twoje skupienie spada~";

@@ -78,8 +78,8 @@ struct BubbleView: View {
             Canvas { ctx, size in
                 for row in 0..<7 { for col in 0..<16 {
                     let x = size.width - 14 - CGFloat(col) * 5 - (row % 2 == 0 ? 0 : 2.5), y = size.height - 12 - CGFloat(row) * 4.5
-                    let r = max(0, 1.1 - CGFloat(col + row) * 0.07)
-                    ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)), with: .color(Ink.pencil.opacity(0.18)))
+                    let r = max(0, 1.7 - CGFloat(col + row) * 0.08)
+                    ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)), with: .color(Ink.pencil.opacity(0.28)))
                 } }
             }
             .clipShape(SpeechBubble())
