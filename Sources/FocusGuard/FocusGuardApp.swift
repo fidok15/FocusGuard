@@ -12,6 +12,12 @@ struct FocusGuardApp: App {
             Snapshots.render(to: CommandLine.arguments[i + 1])
             exit(0)
         }
+        if CommandLine.arguments.contains("--open-menu") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { DebugWindow.openMenu() }
+        }
+        if CommandLine.arguments.contains("--window") {
+            DispatchQueue.main.async { DebugWindow.show() }
+        }
         #endif
     }
 
@@ -41,6 +47,8 @@ final class AppModel: ObservableObject {
     @Published var showSetup = false
     @Published var showSettings = false
     @Published var confirmStop = false
+    /// When the current session started; drives the one-time sweep of the timer wedge.
+    @Published fileprivate(set) var phaseStart = Date.distantPast
 
     @Published var config: SessionConfig { didSet { save() } }
     @Published var sensitivity: Double { didSet { save(); scorer?.params = .forSensitivity(sensitivity) } }
@@ -84,6 +92,15 @@ final class AppModel: ObservableObject {
 
     var timeOfDay: TimeOfDay { timeOverride ?? TimeOfDay(date: now) }
     var timeOverride: TimeOfDay?
+    /// Which card is showing above the timer; changing it plays the card's enter motion.
+    var cardKey: String {
+        if confirmStop { return "confirm" }
+        switch clock.phase {
+        case .study: return "study"
+        case .rest: return "rest"
+        case .idle, .done: return showSetup ? "setup" : (clock.phase == .done ? "done" : "idle")
+        }
+    }
     var remaining: TimeInterval { clock.remaining(at: now) }
     var remainingText: String {
         let s = Int(remaining.rounded(.up))
@@ -102,6 +119,7 @@ final class AppModel: ObservableObject {
         history = []
         nudges = 0
         showSetup = false
+        phaseStart = Date()
         clock.start(config, at: Date())
         // Keeps App Nap from throttling the timer without blocking idle sleep.
         activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
@@ -221,6 +239,67 @@ enum Lines {
 }
 
 #if DEBUG
+/// `swift run FocusGuard --window [morning|day|sunset|night] [--autopet]` shows the scene in a normal window
+/// (printing its window number) so animations can be screen-recorded.
+@MainActor
+enum DebugWindow {
+    static var window: NSWindow?
+
+    /// Clicks our own status item and prints the menu window number, to record the real MenuBarExtra window.
+    static func openMenu() {
+        func find(_ view: NSView?) -> NSButton? {
+            guard let view else { return nil }
+            if let button = view as? NSButton { return button }
+            return view.subviews.lazy.compactMap(find).first
+        }
+        print("windows", NSApp.windows.map(\.className))
+        guard let button = NSApp.windows.lazy.filter({ $0.className.contains("StatusBar") })
+            .compactMap({ find($0.contentView) }).first else { print("no status item"); fflush(stdout); return }
+        button.performClick(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            for w in NSApp.windows where w.isVisible && w.className != "NSStatusBarWindow" {
+                print("menu window \(w.windowNumber) \(w.className) \(w.frame)")
+            }
+            fflush(stdout)
+        }
+    }
+
+    static func show() {
+        let model = AppModel()
+        let args = CommandLine.arguments
+        model.timeOverride = TimeOfDay.allCases.first { args.contains("\($0)") }
+        // --state setup|study|settings|break|done|bubble
+        let state = args.firstIndex(of: "--state").map { args[$0 + 1] } ?? "idle"
+        let t0 = Date()
+        if state == "setup" { model.showSetup = true }
+        if ["study", "settings", "break", "done", "confirm"].contains(state) {
+            model.start()
+            model.cameraService.stop()
+            model.camera = .running
+            model.history = [92, 88, 85, 70, 55, 62, 78, 84, 90, 87]
+            model.focus = 82
+            model.calibrating = false
+            model.now = t0.addingTimeInterval(7 * 60)
+        }
+        if state == "settings" { model.showSettings = true }
+        if state == "confirm" { model.confirmStop = true }
+        if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)) }
+        if state == "done" { model.clock.tick(at: t0.addingTimeInterval(24 * 3600)); model.nudges = 2 }
+        if state == "bubble" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                Bubble.show(Lines.random(for: .lowFocus), cat: model.timeOfDay.art.catFace)
+            }
+        }
+        let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: W, height: H), styleMask: [.titled], backing: .buffered, defer: false)
+        w.contentView = NSHostingView(rootView: DeskScene().environmentObject(model))
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        window = w
+        print("window \(w.windowNumber)")
+        fflush(stdout)
+    }
+}
+
 /// `swift run FocusGuard --snapshots <dir>` renders the scene in key states to PNGs (README screenshots, visual checks).
 @MainActor
 enum Snapshots {

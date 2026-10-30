@@ -62,7 +62,7 @@ struct BubbleView: View {
             if let cat {
                 Image(nsImage: cat).resizable().scaledToFill()
                     .frame(width: 54, height: 54).clipShape(Circle())
-                    .overlay(Circle().stroke(Ink.line, lineWidth: 2.5))
+                    .overlay(Circle().stroke(Ink.pencil, lineWidth: 2.2))
             }
             Text(text)
                 .font(Ink.hand(15))
@@ -72,8 +72,24 @@ struct BubbleView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 22).padding(.bottom, 12)
-        .background(SpeechBubble().fill(Ink.paper).shadow(color: .black.opacity(0.25), radius: 6, y: 3))
-        .overlay(SpeechBubble().stroke(Ink.line, lineWidth: 3))
+        .background {
+            SpeechBubble().fill(Ink.paper).shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+            // Manga screentone in the lower-right corner.
+            Canvas { ctx, size in
+                for row in 0..<7 { for col in 0..<16 {
+                    let x = size.width - 14 - CGFloat(col) * 5 - (row % 2 == 0 ? 0 : 2.5), y = size.height - 12 - CGFloat(row) * 4.5
+                    let r = max(0, 1.1 - CGFloat(col + row) * 0.07)
+                    ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)), with: .color(Ink.pencil.opacity(0.18)))
+                } }
+            }
+            .clipShape(SpeechBubble())
+        }
+        .overlay {
+            // Ink weight: a thin line all round, a heavier second pass fading in toward the lower right.
+            SpeechBubble().stroke(Ink.pencil, style: StrokeStyle(lineWidth: 1.6, lineJoin: .round))
+            SpeechBubble().stroke(Ink.pencil, style: StrokeStyle(lineWidth: 4.2, lineJoin: .round))
+                .mask(LinearGradient(colors: [.clear, .clear, .black], startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
         .padding(6)
         .onTapGesture(perform: dismiss)
     }
