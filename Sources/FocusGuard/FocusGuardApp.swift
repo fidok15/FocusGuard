@@ -93,7 +93,7 @@ final class AppModel: ObservableObject {
     var averageFocus: Int { history.isEmpty ? 0 : Int(history.reduce(0, +) / Double(history.count)) }
     var menuMood: MenuIcon.Mood {
         if alerting { return .alert }
-        return clock.phase.isStudy && !clock.isPaused ? .studying : .sleeping
+        return clock.phase.isStudy && !clock.isPaused ? .studying : .idle
     }
 
     // MARK: Actions
@@ -270,7 +270,7 @@ enum Snapshots {
                 .write(to: URL(fileURLWithPath: "\(dir)/7-bubble.png"))
         }
         let icons = ImageRenderer(content: HStack(spacing: 14) {
-            ForEach([MenuIcon.Mood.sleeping, .studying, .alert], id: \.self) { mood in
+            ForEach([MenuIcon.Mood.idle, .studying, .alert], id: \.self) { mood in
                 Image(nsImage: MenuIcon.image(mood)).renderingMode(.template).foregroundStyle(.black)
             }
         }.padding(8).background(Color.white))
