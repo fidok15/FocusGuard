@@ -265,6 +265,7 @@ enum DebugWindow {
     }
 
     static func show() {
+        NSApp.setActivationPolicy(.accessory) // no Dock icon, no focus steal
         let model = AppModel()
         let args = CommandLine.arguments
         model.timeOverride = TimeOfDay.allCases.first { args.contains("\($0)") }
@@ -292,8 +293,8 @@ enum DebugWindow {
         }
         let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: W, height: H), styleMask: [.titled], backing: .buffered, defer: false)
         w.contentView = NSHostingView(rootView: DeskScene().environmentObject(model))
-        w.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        // Stay behind the user's windows and never take focus; screencapture -l still records it.
+        w.orderBack(nil)
         window = w
         print("window \(w.windowNumber)")
         fflush(stdout)
