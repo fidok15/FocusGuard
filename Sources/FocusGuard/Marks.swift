@@ -145,6 +145,35 @@ struct PressStyle: ButtonStyle {
     }
 }
 
+/// Keyboard focus for the hand-drawn controls: Tab moves between them, Return activates, and the focused one gets a pencil box.
+private struct PencilFocus: ViewModifier {
+    let action: () -> Void
+
+    /// Lives inside the focusable view, so `isFocused` reflects it.
+    private struct Ring: View {
+        @Environment(\.isFocused) private var focused
+
+        var body: some View {
+            if focused {
+                DoodleBox().stroke(Ink.pencil.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                    .padding(-2).allowsHitTesting(false)
+            }
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .overlay { Ring() }
+            .focusable()
+            .focusEffectDisabled()
+            .onKeyPress(.return) { action(); return .handled }
+    }
+}
+
+extension View {
+    func pencilFocus(_ action: @escaping () -> Void) -> some View { modifier(PencilFocus(action: action)) }
+}
+
 /// A − or + written in pencil; a scribble underlines it on hover.
 struct PencilTap: View {
     let glyph: String
@@ -162,6 +191,7 @@ struct PencilTap: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.18), value: hover.value)
     }
@@ -187,6 +217,7 @@ struct WordLink: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.25), value: hover.value)
     }
@@ -215,6 +246,7 @@ struct BoxChoice: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.2), value: hover.value)
         .animation(.easeOut(duration: 0.2), value: checked)

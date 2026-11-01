@@ -1,4 +1,3 @@
-"Set study time" = "Ustaw czas nauki";
 "Pause / resume" = "Pauza / wznów";
 "Settings" = "Ustawienia";
 "settings" = "ustawienia";
@@ -8,7 +7,6 @@
 "no" = "nie";
 "study %lld of %lld" = "nauka %lld z %lld";
 "break %lld of %lld" = "przerwa %lld z %lld";
-"paused, tap the mug" = "pauza, kliknij kubek";
 "study" = "nauka";
 "break" = "przerwa";
 "rounds" = "rundy";
@@ -17,8 +15,6 @@
 "average focus" = "średnie skupienie";
 "nudges: %lld" = "przypomnienia: %lld";
 "new session" = "nowa sesja";
-"tap the timer" = "kliknij minutnik,";
-"to start studying" = "żeby zacząć naukę";
 "focus" = "skupienie";
 "camera is off" = "kamera wyłączona";
 "stretch, drink some water" = "rozciągnij się, napij się wody";
@@ -33,7 +29,6 @@
 "gentle" = "łagodnie";
 "sensitive" = "czule";
 "camera preview" = "podgląd kamery";
-"close the app" = "zamknij aplikację";
 "Quit FocusGuard" = "Zamknij FocusGuard";
 "prrr~" = "mrrr~";
 "Where did you go? The cat is waiting~" = "Gdzie jesteś? Kot czeka~";
@@ -42,3 +37,22 @@
 "Psst… eyes back on the notebook!" = "Psst… wzrok z powrotem na zeszyt!";
 "The cat believes in you. Focus up! ♡" = "Kot w Ciebie wierzy. Skup się! ♡";
 "Deep breath, one more page~" = "Głęboki oddech, jeszcze jedna strona~";
+"Start or stop a study session" = "Rozpocznij lub zakończ sesję nauki";
+"Music" = "Muzyka";
+"paused" = "pauza";
+"paused, space to resume" = "pauza, spacja wznawia";
+"paused, your Mac slept" = "pauza, Mac spał";
+"click the clock to" = "kliknij zegar,";
+"start a study session" = "żeby zacząć naukę";
+"adjust" = "zmień";
+"done" = "gotowe";
+"about the camera" = "o kamerze";
+"FocusGuard looks at you through the camera only while you study. Nothing is saved or sent anywhere." = "FocusGuard patrzy na Ciebie przez kamerę tylko podczas nauki. Nic nie jest zapisywane ani wysyłane.";
+"okay, start" = "dobrze, zaczynam";
+"not now" = "nie teraz";
+"sounds" = "dźwięki";
+"launch at login" = "uruchom przy logowaniu";
+"%lld min, %lld min break, %lld rounds" = "%lld min, przerwa %lld min, rundy: %lld";
+"Break time, stretch a bit~" = "Czas na przerwę, rozciągnij się~";
+"Back to it, you've got this~" = "Wracamy do nauki, dasz radę~";
+"All done, nice work! ♡" = "Gotowe, dobra robota! ♡";

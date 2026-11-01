@@ -371,7 +371,7 @@ private struct PetEffects: View {
                     .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
                     .rotationEffect(.degrees(-4))
                     .opacity(a)
-                    .position(x: min(head.x + 48, W - 34), y: max(head.y - 58, 14) - CGFloat(min(age, 1)) * 4)
+                    .position(x: min(head.x + 34, W - 34), y: max(head.y - 44, 14) - CGFloat(min(age, 1)) * 4)
             }
         }
         .frame(width: W, height: H, alignment: .topLeading)
@@ -587,9 +587,9 @@ private struct RecordSpin: View {
 
     private func draw(in ctx: inout GraphicsContext, time: Double) {
         let angle = time * 2 * .pi * 0.55 // 33 rpm
-        ctx.addFilter(.blur(radius: 1.6))
+        ctx.addFilter(.blur(radius: 1.2))
         // Two soft light wedges across the grooves.
-        for (offset, width, strength) in [(0.0, 0.5, 0.2), (.pi, 0.32, 0.13)] {
+        for (offset, width, strength) in [(0.0, 0.75, 0.5), (.pi * 0.95, 0.45, 0.32)] {
             var wedge = Path()
             let a0 = angle + offset, a1 = a0 + width
             wedge.move(to: project(Spots.vinyl, 0.4, a0))
@@ -602,7 +602,7 @@ private struct RecordSpin: View {
         var tick = Path()
         tick.move(to: project(Spots.label, 0.55, angle * 1.0 + 1.2))
         tick.addLine(to: project(Spots.label, 0.9, angle * 1.0 + 1.2))
-        ctx.stroke(tick, with: .color(Ink.pencil.opacity(0.55)), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+        ctx.stroke(tick, with: .color(Ink.pencil.opacity(0.85)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
     }
 
     private struct Notes: View {
@@ -612,14 +612,14 @@ private struct RecordSpin: View {
             ZStack(alignment: .topLeading) {
                 ForEach(0..<3, id: \.self) { i in
                     let phase = (time * 0.2 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                    let base = P(345, 800)
+                    let base = P(110, 790)
                     Image(systemName: i == 1 ? "music.quarternote.3" : "music.note")
                         .font(.system(size: 11 + CGFloat(i) * 1.5, weight: .bold))
-                        .foregroundStyle(Color(red: 1, green: 0.93, blue: 0.75))
-                        .shadow(color: .black.opacity(0.4), radius: 1.2, y: 1)
+                        .foregroundStyle(Ink.pencil)
+                        .shadow(color: .white.opacity(0.7), radius: 1.5)
                         .opacity(calmMotion ? 0.8 : sin(phase * .pi) * 0.9)
-                        .position(x: base.x + CGFloat(phase) * 26 + CGFloat(sin(phase * 9 + Double(i) * 2)) * 4 + CGFloat(i) * 9,
-                                  y: base.y - CGFloat(phase) * 52 - CGFloat(i) * 4)
+                        .position(x: base.x + CGFloat(phase) * 30 + CGFloat(sin(phase * 9 + Double(i) * 2)) * 4 + CGFloat(i) * 16,
+                                  y: base.y - CGFloat(phase) * 70 - CGFloat(i) * 6)
                 }
             }
             .frame(width: W, height: H, alignment: .topLeading)
