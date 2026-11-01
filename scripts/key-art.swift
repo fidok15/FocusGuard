@@ -23,11 +23,17 @@ func color(_ i: Int) -> (Double, Double, Double) {
     (Double(px[i * 4]) / 255, Double(px[i * 4 + 1]) / 255, Double(px[i * 4 + 2]) / 255)
 }
 func median(_ v: [Double]) -> Double { v.sorted()[v.count / 2] }
-let corners = [(4, 4), (w - 5, 4), (4, h - 5), (w - 5, h - 5), (w / 2, 3), (w / 2, h - 4)].map { color($0.1 * w + $0.0) }
-let key = (median(corners.map(\.0)), median(corners.map(\.1)), median(corners.map(\.2)))
+// Top and bottom borders are sampled separately: the generator sometimes shades the bottom border darker
+// (morning: 0.70 vs 0.94), and a single key left an opaque magenta band there.
+func sampleKey(_ pts: [(Int, Int)]) -> (Double, Double, Double) {
+    let c = pts.map { color($0.1 * w + $0.0) }
+    return (median(c.map(\.0)), median(c.map(\.1)), median(c.map(\.2)))
+}
+let key = sampleKey([(4, 4), (w - 5, 4), (w / 2, 3)])
+let keyBottom = sampleKey([(4, h - 5), (w - 5, h - 5), (w / 2, h - 4)])
 func distance(_ i: Int) -> Double {
     let c = color(i)
-    return sqrt(pow(c.0 - key.0, 2) + pow(c.1 - key.1, 2) + pow(c.2 - key.2, 2))
+    return [key, keyBottom].map { sqrt(pow(c.0 - $0.0, 2) + pow(c.1 - $0.1, 2) + pow(c.2 - $0.2, 2)) }.min()!
 }
 
 // ponytail: tolerances tuned on the four Gemini scenes. A vivid magenta border is far from any room
