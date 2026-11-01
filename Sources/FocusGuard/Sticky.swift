@@ -94,9 +94,12 @@ struct SettingsNote: View {
                 Spacer()
                 Text("sensitive")
             }.font(Ink.hand(11))
-            BoxChoice(title: "camera preview", checked: model.showPreview) { model.showPreview.toggle() }
-                .padding(.top, 4)
-            WordLink(title: "close the app", size: 11, underlined: true) { NSApp.terminate(nil) }
+            VStack(alignment: .leading, spacing: 1) {
+                BoxChoice(title: "camera preview", checked: model.showPreview) { model.showPreview.toggle() }
+                BoxChoice(title: "sounds", checked: model.soundsOn) { model.soundsOn.toggle() }
+                BoxChoice(title: "launch at login", checked: model.launchAtLogin) { model.launchAtLogin.toggle() }
+            }
+            .padding(.top, 4)
         }
         .foregroundStyle(Ink.pencil)
         .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 12)

@@ -182,6 +182,30 @@ func zeroConfigIsClamped() {
     check(clock.phase == .done)
 }
 
+func lcdDigitsAndText() {
+    check(SevenSegment.mask(8) == 0b1111111)
+    check(SevenSegment.mask(1) == 0b0000110)
+    check(SevenSegment.mask(7) == 0b0000111)
+    check(ClockText.countdown(24 * 60 + 59.2) == [2, 5, 0, 0])
+    check(ClockText.countdown(24 * 60 + 58.5) == [2, 4, 5, 9])
+    check(ClockText.countdown(0.2) == [0, 0, 0, 1])
+    check(ClockText.countdown(0) == [0, 0, 0, 0])
+    check(ClockText.countdown(-5) == [0, 0, 0, 0])
+    check(ClockText.countdown(90 * 60) == [9, 0, 0, 0])
+    check(ClockText.countdown(10_000_000) == [9, 9, 5, 9])
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC")!
+    check(ClockText.wall(Date(timeIntervalSince1970: 3600 * 7 + 60 * 5), calendar: cal) == [0, 7, 0, 5])
+}
+
+func phaseAnnouncements() {
+    check(Phase.study(round: 1).announcement(to: .rest(round: 1)) == .breakStarted)
+    check(Phase.rest(round: 1).announcement(to: .study(round: 2)) == .backToWork)
+    check(Phase.study(round: 4).announcement(to: .done) == .allDone)
+    check(Phase.idle.announcement(to: .study(round: 1)) == nil)
+    check(Phase.study(round: 1).announcement(to: .idle) == nil)
+}
+
 let checks: [(String, () -> Void)] = [
     ("noInstantAlertAfterFrameGap", noInstantAlertAfterFrameGap),
     ("delayedCalibrationStillWorks", delayedCalibrationStillWorks),
@@ -204,6 +228,8 @@ let checks: [(String, () -> Void)] = [
     ("sessionRunsStudyBreakCyclesToDone", sessionRunsStudyBreakCyclesToDone),
     ("sessionSkipsPhasesMissedDuringSleep", sessionSkipsPhasesMissedDuringSleep),
     ("pauseFreezesRemainingTime", pauseFreezesRemainingTime),
+    ("lcdDigitsAndText", lcdDigitsAndText),
+    ("phaseAnnouncements", phaseAnnouncements),
 ]
 for (name, body) in checks {
     current = name
