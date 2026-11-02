@@ -36,7 +36,9 @@ Camera frames are analyzed in memory on your Mac with Apple's Vision framework, 
 4. Look for the timer icon in the menu bar. The app has no Dock icon or window of its own.
 5. Allow camera access when you start your first study session. If you denied it, enable FocusGuard in **System Settings › Privacy & Security › Camera**. The timer works without the camera, but focus tracking won't.
 
-To quit, use the ⏻ button in the top-right corner of the scene, or press ⌘Q while it's open.
+To quit, click the washi-tape × on the top-right corner of the room, press ⌘Q while the panel is open, or use Quit in the right-click menu of the menu bar icon.
+
+Press **⌥⌘F** anywhere to open or close the panel (no Accessibility permission needed). Right-click the menu bar icon for start/pause, stop, settings and quit. Every 4th break is three times as long (at most 30 minutes). To use FocusGuard as a plain timer, untick *use camera* on the settings sticky note.
 
 Requires macOS 14 or later.
 
