@@ -39,6 +39,16 @@ public struct SessionClock: Sendable {
 
     public var isPaused: Bool { pausedRemaining != nil }
 
+    /// Every 4th break is three times as long, capped at 30 minutes.
+    public func breakMinutes(after round: Int) -> Int {
+        round % 4 == 0 ? max(config.breakMinutes, min(30, config.breakMinutes * 3)) : config.breakMinutes
+    }
+
+    public var isLongBreak: Bool {
+        if case .rest(let round) = phase { return breakMinutes(after: round) > config.breakMinutes }
+        return false
+    }
+
     public func remaining(at now: Date) -> TimeInterval {
         if let pausedRemaining { return pausedRemaining }
         guard let phaseEnd else { return 0 }
@@ -100,7 +110,8 @@ public struct SessionClock: Sendable {
 
     private mutating func enter(_ phase: Phase, at time: Date) {
         self.phase = phase
-        let minutes = phase.isStudy ? config.studyMinutes : config.breakMinutes
+        var minutes = config.studyMinutes
+        if case .rest(let round) = phase { minutes = breakMinutes(after: round) }
         phaseDuration = TimeInterval(minutes * 60)
         phaseEnd = time.addingTimeInterval(phaseDuration)
     }

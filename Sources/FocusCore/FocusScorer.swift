@@ -91,6 +91,8 @@ public final class FocusScorer {
     private var baseline: (yaw: Double, pitch: Double, ear: Double)?
     private var closedSince: Double?
     private var absentSince: Double?
+    /// Nobody counts as absent before the first face of this stretch: coming back late from a break is not a lapse.
+    private var faceSeen = false
     private var absentAlerted = false
     private var belowSince: Double?
     private var lastAlert: Double?
@@ -124,10 +126,12 @@ public final class FocusScorer {
 
     public func classify(_ s: FaceSignals, at t: Double) -> FrameState {
         guard s.faceFound else {
+            guard faceSeen else { return .skipped }
             if absentSince == nil { absentSince = t }
             closedSince = nil
             return .absent
         }
+        faceSeen = true
         if absentSince != nil {
             // Back at the desk: the windowed score still lags, so don't let it count as an already-held drop.
             absentSince = nil

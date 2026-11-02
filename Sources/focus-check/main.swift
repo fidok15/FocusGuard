@@ -88,6 +88,31 @@ func sessionRunsStudyBreakCyclesToDone() {
     check(clock.phase == .done)
 }
 
+func everyFourthBreakIsLong() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 8), at: t0)
+    check(clock.breakMinutes(after: 3) == 5 && clock.breakMinutes(after: 4) == 15 && clock.breakMinutes(after: 8) == 15)
+    clock.tick(at: t0 + (25 + 5 + 25 + 5 + 25 + 5 + 25) * 60)
+    check(clock.phase == .rest(round: 4) && clock.isLongBreak && clock.phaseDuration == 15 * 60)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 20, rounds: 8), at: t0)
+    check(clock.breakMinutes(after: 4) == 30)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 30, rounds: 8), at: t0)
+    check(clock.breakMinutes(after: 4) == 30)
+}
+
+func absentIsNotCountedBeforeFirstFace() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    for i in 0...600 { check(scorer.process(.noFace, at: Double(i) / fps) == nil) } // 60 s at an empty chair
+    check(scorer.score == 100)
+    var events: [FocusEvent] = []
+    for i in 601...1100 { // then a face, then 20 s gone
+        let t = Double(i) / fps
+        if let e = scorer.process(i < 700 ? look : .noFace, at: t) { events.append(e) }
+    }
+    check(events == [.absent])
+}
+
 func sessionSkipsPhasesMissedDuringSleep() {
     var clock = SessionClock()
     let t0 = Date(timeIntervalSinceReferenceDate: 0)
@@ -230,6 +255,8 @@ let checks: [(String, () -> Void)] = [
     ("pauseFreezesRemainingTime", pauseFreezesRemainingTime),
     ("lcdDigitsAndText", lcdDigitsAndText),
     ("phaseAnnouncements", phaseAnnouncements),
+    ("everyFourthBreakIsLong", everyFourthBreakIsLong),
+    ("absentIsNotCountedBeforeFirstFace", absentIsNotCountedBeforeFirstFace),
 ]
 for (name, body) in checks {
     current = name
