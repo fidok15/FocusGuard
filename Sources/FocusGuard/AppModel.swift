@@ -32,7 +32,7 @@ final class AppModel: ObservableObject {
     /// True once Tab was used, so the pencil focus box shows only for keyboard navigation.
     @Published var usingKeyboard = false
     /// A pencil control has keyboard focus: space then belongs to it.
-    var focusedControls = 0
+    var focusedControls = 0 { didSet { focusedControls = max(0, focusedControls) } } // onChange and onDisappear can both fire for one control
     var controlFocused: Bool { focusedControls > 0 }
     var panelOpen = false
 
@@ -333,7 +333,7 @@ final class AppModel: ObservableObject {
         let reset = DispatchWorkItem { [weak self] in self?.alerting = false }
         alertReset = reset
         DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: reset)
-        Bubble.show(Lines.random(for: event), cat: timeOfDay.art.catFace)
+        if !panelOpen { Bubble.show(Lines.random(for: event), cat: timeOfDay.art.catFace) } // the open panel shows the alert cat
     }
 
     private func save() {
