@@ -43,7 +43,7 @@ struct SessionCard: View {
                 .id(key)
         }
         .frame(width: W, height: H, alignment: .topLeading)
-        .offset(x: Spots.clockTop.x - size.width / 2, y: Spots.clockTop.y - Self.tail - size.height)
+        .offset(x: Spots.clockTop.x - size.width / 2 - 12, y: Spots.clockTop.y - Self.tail - size.height)
     }
 }
 

@@ -46,7 +46,7 @@ enum DebugWindow {
     static func show() {
         let model = AppModel()
         configure(model)
-        let size = NSSize(width: W + 2 * PAD, height: H + 2 * PAD)
+        let size = NSSize(width: CW + 2 * PAD, height: CH + 2 * PAD)
         let w = NSWindow(contentRect: NSRect(origin: CGPoint(x: 200, y: 200), size: size), styleMask: [.borderless], backing: .buffered, defer: false)
         w.isOpaque = false
         w.backgroundColor = .clear

@@ -33,7 +33,7 @@ final class PanelController: NSObject {
     init(model: AppModel, quiet: Bool = false) {
         self.model = model
         self.quiet = quiet
-        panel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: W + 2 * PAD, height: H + 2 * PAD),
+        panel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: CW + 2 * PAD, height: CH + 2 * PAD),
                               styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init()
         panel.isReleasedWhenClosed = false

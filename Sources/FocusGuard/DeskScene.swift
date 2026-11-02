@@ -10,6 +10,8 @@ let W: CGFloat = 720
 let H: CGFloat = 402
 /// Transparent margin around the scene inside the panel, so the drop shadow of the art and its pop-outs is not cut off.
 let PAD: CGFloat = 14
+/// The opaque picture does not reach the edges of the 2000x1116 canvas, so the panel shows only this part of it (scene points).
+let OX: CGFloat = 9, OY: CGFloat = 29.5, CW: CGFloat = 706, CH: CGFloat = 346
 
 /// Art space (2000x1116) to scene points.
 func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x / 2000 * W, y: y / 1116 * H) }
@@ -19,24 +21,12 @@ private func R(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> CGRect
     CGRect(x: x / 2000, y: y / 1116, width: w / 2000, height: h / 1116)
 }
 
-/// Objects drawn in the same place in all four scenes (art coordinates).
+/// Places that are the same in all four scenes (art coordinates). Everything that differs per scene lives in `Props`.
 enum Spots {
-    /// The dark LCD glass of the desk clock: top-left, top-right, bottom-right, bottom-left.
-    static let lcd = [CGPoint(x: 440, y: 727), CGPoint(x: 647, y: 700), CGPoint(x: 647, y: 766), CGPoint(x: 442, y: 794)]
     /// Where the card's tail points: the middle of the clock's top edge.
-    static let clockTop = P(520, 672)
-    static let steam = R(1395, 520, 130, 165)
-    static let polaroid = R(1665, 350, 235, 215)
-    /// Vinyl and label of the record player as ellipses: center, semi-axes, tilt in degrees.
-    static let vinyl = (center: CGPoint(x: 211, y: 862), a: CGFloat(146), b: CGFloat(47), tilt: CGFloat(-3.9))
-    static let label = (center: CGPoint(x: 212.5, y: 855), a: CGFloat(53.5), b: CGFloat(18), tilt: CGFloat(-6))
-    /// Tonearm, redrawn from the art above the spinning sheen so it does not spin.
-    static let tonearm = [236, 787, 252, 784, 273, 787, 275, 797, 320, 828, 332, 834, 338, 853, 334, 861, 327, 860, 312, 840, 305, 836,
-                          266, 807, 254, 810, 237, 803].chunks2
-}
-
-extension Array where Element == Int {
-    var chunks2: [CGPoint] { stride(from: 0, to: count, by: 2).map { CGPoint(x: self[$0], y: self[$0 + 1]) } }
+    static let clockTop = P(600, 650)
+    static let steam = R(1320, 500, 130, 160)
+    static let polaroid = R(1540, 175, 210, 150)
 }
 
 extension View {
@@ -125,16 +115,17 @@ enum TimeOfDay: CaseIterable {
     }
 
     var art: SceneArt { Self.arts[self]! }
+    var props: Props { self == .day ? .day : self == .sunset ? .sunset : .morning }
 
     private static let arts: [TimeOfDay: SceneArt] = [
         .morning: SceneArt(url: SceneArt.locate("scene_morning"), silhouette: Silhouette.catMorning,
-                           head: CGPoint(x: 990, y: 620), headRadius: 82),
+                           head: CGPoint(x: 1000, y: 612), headRadius: 56),
         .day: SceneArt(url: SceneArt.locate("scene_day"), silhouette: Silhouette.catDay,
-                       head: CGPoint(x: 872, y: 548), headRadius: 62),
+                       head: CGPoint(x: 898, y: 552), headRadius: 36),
         .sunset: SceneArt(url: SceneArt.locate("scene_sunset"), silhouette: Silhouette.catSunset,
-                          head: CGPoint(x: 1770, y: 672), headRadius: 88),
+                          head: CGPoint(x: 1660, y: 655), headRadius: 52),
         .night: SceneArt(url: SceneArt.locate("scene_night"), silhouette: Silhouette.catNight,
-                         head: CGPoint(x: 1655, y: 925), headRadius: 95),
+                         head: CGPoint(x: 1525, y: 858), headRadius: 60),
     ]
 }
 
@@ -143,7 +134,7 @@ enum TimeOfDay: CaseIterable {
 /// What the panel and the debug window show: the scene with a transparent margin for the shadow.
 struct PanelRoot: View {
     var body: some View {
-        DeskScene().padding(PAD)
+        DeskScene().offset(x: -OX, y: -OY).frame(width: CW, height: CH, alignment: .topLeading).padding(PAD)
     }
 }
 
@@ -166,16 +157,16 @@ struct DeskScene: View {
 
             CatLayer(art: tod.art).id(tod)
 
-            RecordSpin(image: tod.art.image).id(tod).allowsHitTesting(false)
+            RecordSpin(image: tod.art.image, props: tod.props).id(tod).allowsHitTesting(false)
             Steam().place(Spots.steam).allowsHitTesting(false)
             ClockDisplay().allowsHitTesting(false)
 
-            Hotspot(name: "clock", groups: [Silhouette.clock], help: "Start or stop a study session", action: model.clockTapped)
-            Hotspot(name: "mug", groups: [Silhouette.mug], help: "Pause / resume", action: model.togglePause)
-            Hotspot(name: "sticky", groups: [Silhouette.noteLeft, Silhouette.noteRight], smooth: false, help: "Settings") {
+            Hotspot(name: "clock", groups: [tod.props.clock], help: "Start or stop a study session", action: model.clockTapped)
+            Hotspot(name: "mug", groups: [tod.props.mug], help: "Pause / resume", action: model.togglePause)
+            Hotspot(name: "sticky", groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, help: "Settings") {
                 model.toggleSettings()
             }
-            Hotspot(name: "record", groups: [Silhouette.record], help: "Music") { model.musicOn.toggle() }
+            Hotspot(name: "record", groups: [tod.props.record], help: "Music") { model.musicOn.toggle() }
 
             SessionCard()
 
@@ -184,7 +175,7 @@ struct DeskScene: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
-            QuitButton().position(x: 680, y: 23)
+            QuitButton().position(x: 622, y: 52) // on the top-right corner of the room
 
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
@@ -420,22 +411,28 @@ private struct Steam: View {
 private struct ClockDisplay: View {
     @EnvironmentObject var model: AppModel
 
-    /// Bounding box of the glass in art coordinates.
-    private static let box = CGRect(x: 436, y: 696, width: 216, height: 102)
     private static let green = Color(red: 0.55, green: 0.95, blue: 0.62)
     private static let amber = Color(red: 1, green: 0.74, blue: 0.3)
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.1)) { context in
-            Canvas { ctx, size in
-                draw(in: &ctx, size: size, date: context.date)
-            }
-        }
-        .frame(width: Self.box.width / 2000 * W, height: Self.box.height / 1116 * H)
-        .position(x: Self.box.midX / 2000 * W, y: Self.box.midY / 1116 * H)
+    /// Bounding box of the glass in art coordinates.
+    private var box: CGRect {
+        let q = model.timeOfDay.props.lcd
+        let x0 = q.map(\.x).min()! - 4, y0 = q.map(\.y).min()! - 4
+        return CGRect(x: x0, y: y0, width: q.map(\.x).max()! + 4 - x0, height: q.map(\.y).max()! + 4 - y0)
     }
 
-    private func draw(in ctx: inout GraphicsContext, size: CGSize, date: Date) {
+    var body: some View {
+        let box = box
+        TimelineView(.animation(minimumInterval: 0.1)) { context in
+            Canvas { ctx, size in
+                draw(in: &ctx, size: size, date: context.date, box: box)
+            }
+        }
+        .frame(width: box.width / 2000 * W, height: box.height / 1116 * H)
+        .position(x: box.midX / 2000 * W, y: box.midY / 1116 * H)
+    }
+
+    private func draw(in ctx: inout GraphicsContext, size: CGSize, date: Date, box: CGRect) {
         let phase = model.clock.phase, paused = model.clock.isPaused
         let second = date.timeIntervalSinceReferenceDate
         let digits: [Int]
@@ -453,8 +450,8 @@ private struct ClockDisplay: View {
         let age = date.timeIntervalSince(model.phaseStart)
         let flash = age >= 0 && age < 0.9 && !calmMotion ? (1 - age / 0.9) * abs(sin(age * .pi * 2.6)) : 0
 
-        let scale = size.width / Self.box.width
-        let spec = LCDLayout(box: Self.box, scale: scale)
+        let scale = size.width / box.width
+        let spec = LCDLayout(box: box, lcd: model.timeOfDay.props.lcd, scale: scale)
         // Faint unlit segments, like real LCD glass.
         spec.draw(&ctx, digits: [8, 8, 8, 8], colon: true, color: color.opacity(0.07))
         ctx.drawLayer { layer in
@@ -472,6 +469,7 @@ private struct ClockDisplay: View {
 /// Seven-segment digits laid out on the clock's sheared glass (art coordinates mapped through the glass quad).
 private struct LCDLayout {
     let box: CGRect
+    let lcd: [CGPoint]
     let scale: CGFloat
 
     private let digitW: CGFloat = 36, digitH: CGFloat = 50, thick: CGFloat = 7, slant: CGFloat = 0.12
@@ -479,7 +477,7 @@ private struct LCDLayout {
 
     /// Glass-local coordinates (0...207, 0...66) to canvas points, bilinear over the measured quad.
     private func map(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-        let q = Spots.lcd, u = x / glassW, v = y / glassH
+        let q = lcd, u = x / glassW, v = y / glassH
         let ax = (1 - u) * (1 - v) * q[0].x + u * (1 - v) * q[1].x + u * v * q[2].x + (1 - u) * v * q[3].x
         let ay = (1 - u) * (1 - v) * q[0].y + u * (1 - v) * q[1].y + u * v * q[2].y + (1 - u) * v * q[3].y
         return CGPoint(x: (ax - box.minX) * scale, y: (ay - box.minY) * scale)
@@ -555,6 +553,7 @@ private struct LCDLayout {
 private struct RecordSpin: View {
     @EnvironmentObject var model: AppModel
     let image: NSImage?
+    let props: Props
 
     private var spinning: Bool { model.musicOn && !(calmMotion && model.clock.phase.isStudy) }
 
@@ -568,7 +567,7 @@ private struct RecordSpin: View {
                 }
                 // Put the arm back on top of the sheen.
                 Image(nsImage: image).resizable().frame(width: W, height: H)
-                    .mask { OutlineShape(groups: [Spots.tonearm], smooth: false).fill(Color.black).frame(width: W, height: H) }
+                    .mask { OutlineShape(groups: [props.tonearm], smooth: false).fill(Color.black).frame(width: W, height: H) }
                 TimelineView(.animation(minimumInterval: 1 / 30)) { context in
                     Notes(time: context.date.timeIntervalSinceReferenceDate)
                 }
@@ -592,16 +591,16 @@ private struct RecordSpin: View {
         for (offset, width, strength) in [(0.0, 0.75, 0.5), (.pi * 0.95, 0.45, 0.32)] {
             var wedge = Path()
             let a0 = angle + offset, a1 = a0 + width
-            wedge.move(to: project(Spots.vinyl, 0.4, a0))
-            for k in 0...10 { wedge.addLine(to: project(Spots.vinyl, 0.97, a0 + (a1 - a0) * Double(k) / 10)) }
-            wedge.addLine(to: project(Spots.vinyl, 0.4, a1))
+            wedge.move(to: project(props.vinyl, 0.4, a0))
+            for k in 0...10 { wedge.addLine(to: project(props.vinyl, 0.97, a0 + (a1 - a0) * Double(k) / 10)) }
+            wedge.addLine(to: project(props.vinyl, 0.4, a1))
             wedge.closeSubpath()
             ctx.fill(wedge, with: .color(Color(red: 0.85, green: 0.9, blue: 1).opacity(strength)))
         }
         // A scuff on the label, to see the turning.
         var tick = Path()
-        tick.move(to: project(Spots.label, 0.55, angle * 1.0 + 1.2))
-        tick.addLine(to: project(Spots.label, 0.9, angle * 1.0 + 1.2))
+        tick.move(to: project(props.label, 0.55, angle * 1.0 + 1.2))
+        tick.addLine(to: project(props.label, 0.9, angle * 1.0 + 1.2))
         ctx.stroke(tick, with: .color(Ink.pencil.opacity(0.85)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
     }
 
@@ -612,7 +611,7 @@ private struct RecordSpin: View {
             ZStack(alignment: .topLeading) {
                 ForEach(0..<3, id: \.self) { i in
                     let phase = (time * 0.2 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                    let base = P(110, 790)
+                    let base = P(330, 640)
                     Image(systemName: i == 1 ? "music.quarternote.3" : "music.note")
                         .font(.system(size: 11 + CGFloat(i) * 1.5, weight: .bold))
                         .foregroundStyle(Ink.pencil)
