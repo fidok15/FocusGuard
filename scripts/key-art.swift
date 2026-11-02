@@ -7,7 +7,7 @@ import AppKit
 let input = CommandLine.arguments[1], output = CommandLine.arguments[2]
 let original = NSImage(contentsOfFile: input)!
 let w = 2000 // plenty for a 720 pt window on Retina
-let h = Int((Double(w) * original.size.height / original.size.width).rounded())
+let h = 1116 // fixed: the app measures art on a 2000x1116 grid; Gemini outputs vary by a pixel or two
 
 // Draw into a known RGBA8 buffer at the output size.
 let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,

@@ -14,7 +14,7 @@ for path in CommandLine.arguments.dropFirst() {
     var erased = 0, tinted = 0
     for y in 0..<h {
         for x in 0..<w {
-            guard x < 130 || x > w - 130 || y < 70 || y > h - 70 else { continue }
+            guard x < 330 || x > w - 330 || y < 120 || y > h - 120 else { continue }
             let i = (y * w + x) * 4
             let a = Double(buf[i + 3]) / 255
             guard a > 0 else { continue }
