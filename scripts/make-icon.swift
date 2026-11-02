@@ -7,13 +7,13 @@ let art = CGImageSourceCreateImageAtIndex(source, 0, nil)!
 let pw = CGFloat(art.width), ph = CGFloat(art.height)
 
 // Square around the clock (measured on the 2000x1116 art; the PNG is that size).
-let side: CGFloat = 330
-let center = CGPoint(x: 520, y: 742)
+let side: CGFloat = 290
+let center = CGPoint(x: 609, y: 712)
 let cropRect = CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)
 let plain = art.cropping(to: cropRect)!
 
 // Seven-segment digits on the clock's sheared glass, same geometry as the app (DeskScene.swift).
-let glass = [CGPoint(x: 440, y: 727), CGPoint(x: 647, y: 700), CGPoint(x: 647, y: 766), CGPoint(x: 442, y: 794)]
+let glass = [CGPoint(x: 548, y: 704), CGPoint(x: 711, y: 683), CGPoint(x: 711, y: 727), CGPoint(x: 549, y: 752)]
 let masks: [UInt8] = [0b0111111, 0b0000110, 0b1011011, 0b1001111, 0b1100110, 0b1101101, 0b1111101, 0b0000111, 0b1111111, 0b1101111]
 let crop: CGImage = {
     let w = plain.width, h = plain.height
