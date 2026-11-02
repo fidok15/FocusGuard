@@ -168,7 +168,7 @@ struct DeskScene: View {
             }
             Hotspot(name: "record", groups: [tod.props.record], help: "Music") { model.musicOn.toggle() }
 
-            SessionCard()
+            if !model.showSettings { SessionCard() } // the note takes the card's place
 
             if model.showPreview && model.camera == .running {
                 Polaroid(session: model.cameraService.session).place(Spots.polaroid)
@@ -180,7 +180,7 @@ struct DeskScene: View {
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
                 SettingsNote()
-                    .position(x: 566, y: 266)
+                    .position(x: 128, y: 136)
                     .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
         }
@@ -611,7 +611,7 @@ private struct RecordSpin: View {
             ZStack(alignment: .topLeading) {
                 ForEach(0..<3, id: \.self) { i in
                     let phase = (time * 0.2 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                    let base = P(330, 640)
+                    let base = P(130, 620)
                     Image(systemName: i == 1 ? "music.quarternote.3" : "music.note")
                         .font(.system(size: 11 + CGFloat(i) * 1.5, weight: .bold))
                         .foregroundStyle(Ink.pencil)

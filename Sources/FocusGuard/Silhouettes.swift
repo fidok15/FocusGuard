@@ -81,6 +81,7 @@ struct HoverGlow: View {
     var body: some View {
         ZStack {
             shape.fill(Color(red: 1, green: 0.95, blue: 0.8).opacity(0.1))
+            shape.stroke(Color(red: 0.25, green: 0.16, blue: 0.08).opacity(0.5), style: StrokeStyle(lineWidth: 3.5, lineJoin: .round)) // keeps pale objects readable
             shape.stroke(Color(red: 1, green: 0.96, blue: 0.82).opacity(0.9), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
                 .shadow(color: Color(red: 1, green: 0.9, blue: 0.6).opacity(0.9), radius: 5)
         }

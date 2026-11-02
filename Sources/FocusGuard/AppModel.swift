@@ -23,10 +23,20 @@ final class AppModel: ObservableObject {
     @Published var pausedBySleep = false
     /// When the current phase started; drives the clock's start flash.
     @Published var phaseStart = Date.distantPast
+    /// This session runs as a plain timer: the camera setting is off, or "not now" was chosen on the camera card.
+    @Published var timerOnly = false
+    /// Why launch at login could not be set, shown on the settings note.
+    @Published var loginNote: String?
+    /// True once Tab was used, so the pencil focus box shows only for keyboard navigation.
+    @Published var usingKeyboard = false
+    /// A pencil control has keyboard focus: space then belongs to it.
+    var controlFocused = false
+    var panelOpen = false
 
     @Published var config: SessionConfig { didSet { save() } }
     @Published var sensitivity: Double { didSet { save(); scorer?.params = .forSensitivity(sensitivity) } }
     @Published var showPreview: Bool { didSet { save() } }
+    @Published var useCamera: Bool { didSet { save() } }
     @Published var soundsOn: Bool { didSet { save() } }
     @Published var musicOn: Bool { didSet { save() } }
     @Published var launchAtLogin: Bool {
@@ -34,10 +44,11 @@ final class AppModel: ObservableObject {
             guard !syncingLogin, launchAtLogin != oldValue else { return }
             do {
                 if launchAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                loginNote = SMAppService.mainApp.status == .requiresApproval
+                    ? String(localized: "allow it in System Settings, Login Items") : nil
             } catch { // not running from an app bundle (swift run), or the user removed it in System Settings
-                syncingLogin = true
-                launchAtLogin = oldValue
-                syncingLogin = false
+                syncLogin()
+                loginNote = String(localized: "only works from the installed app")
             }
         }
     }
@@ -55,6 +66,8 @@ final class AppModel: ObservableObject {
     private var timer: Timer?
     private var alertReset: DispatchWorkItem?
     private var syncingLogin = false
+    /// Bumped whenever the camera is started or stopped, so a late start completion cannot overwrite a newer state.
+    private var cameraGeneration = 0
 
     init() {
         let d = UserDefaults.standard
@@ -63,11 +76,12 @@ final class AppModel: ObservableObject {
                                rounds: d.object(forKey: "rounds") as? Int ?? 4)
         sensitivity = d.object(forKey: "sensitivity") as? Double ?? 0.5
         showPreview = d.object(forKey: "showPreview") as? Bool ?? false
+        useCamera = d.object(forKey: "useCamera") as? Bool ?? true
         soundsOn = d.object(forKey: "soundsOn") as? Bool ?? true
         musicOn = d.object(forKey: "musicOn") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
 
         cameraService.onSignals = { [weak self] signals, t in
             Task { @MainActor in self?.handle(signals, at: t) }
@@ -110,7 +124,11 @@ final class AppModel: ObservableObject {
         let s = Int(remaining.rounded(.up))
         return String(format: "%d:%02d", s / 60, s % 60)
     }
-    var averageFocus: Int { history.isEmpty ? 0 : Int(history.reduce(0, +) / Double(history.count)) }
+    /// nil without camera data: no figure is better than a made-up one.
+    var studiedMinutes: Int { clock.config.studyMinutes * clock.config.rounds }
+    var averageFocus: Int? { history.isEmpty ? nil : Int(history.reduce(0, +) / Double(history.count)) }
+    /// Focus figures need a running camera that has finished calibrating on a real face.
+    var showsFocus: Bool { !timerOnly && camera == .running && !calibrating }
     var menuMood: MenuIcon.Mood {
         if alerting { return .alert }
         return clock.phase.isStudy && !clock.isPaused ? .studying : .idle
@@ -126,7 +144,7 @@ final class AppModel: ObservableObject {
     func requestStart() {
         showSettings = false
         showSetup = false
-        if !cameraExplained && AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
+        if useCamera && !cameraExplained && AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
             showCameraWhy = true
         } else {
             start()
@@ -139,7 +157,14 @@ final class AppModel: ObservableObject {
         start()
     }
 
-    func start() {
+    /// "not now" on the camera card: the session still starts, as a plain timer.
+    func startWithoutCamera() {
+        showCameraWhy = false
+        start(withCamera: false)
+    }
+
+    func start(withCamera: Bool = true) {
+        timerOnly = !(withCamera && useCamera)
         history = []
         nudges = 0
         showSetup = false
@@ -192,7 +217,22 @@ final class AppModel: ObservableObject {
         confirmStop = false
     }
 
+    func panelOpened() {
+        panelOpen = true
+        now = Date()
+        usingKeyboard = false
+        syncLogin()
+    }
+
+    /// Launch at login can change behind our back (System Settings), so read it again whenever the panel opens.
+    private func syncLogin() {
+        syncingLogin = true
+        launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
+        syncingLogin = false
+    }
+
     func panelClosed() {
+        panelOpen = false
         showSettings = false
         showCameraWhy = false
         confirmStop = false
@@ -206,19 +246,21 @@ final class AppModel: ObservableObject {
 
     private func tick() {
         let before = clock.phase
-        now = Date()
-        if clock.tick(at: now) {
+        let date = Date()
+        if panelOpen || clock.phase.isRunning { now = date } // nothing on screen changes otherwise
+        if clock.tick(at: date) {
+            now = date
             phaseChanged()
-            phaseStart = now
+            phaseStart = date
             if let announcement = before.announcement(to: clock.phase) { announce(announcement) }
         }
         guard clock.phase.isStudy, !clock.isPaused else { return }
-        if !calibrating, now.timeIntervalSince(lastSample) >= 5 {
+        if showsFocus, now.timeIntervalSince(lastSample) >= 5 {
             history.append(focus)
             lastSample = now
         }
         // Camera unplugged or busy: retry every 5 s.
-        if camera == .unavailable, now.timeIntervalSince(lastCameraRetry) >= 5 {
+        if camera == .unavailable, !timerOnly, now.timeIntervalSince(lastCameraRetry) >= 5 {
             lastCameraRetry = now
             startCamera()
         }
@@ -239,13 +281,14 @@ final class AppModel: ObservableObject {
     /// Camera runs only while actively studying.
     private func phaseChanged() {
         now = Date()
-        if clock.phase.isStudy && !clock.isPaused {
+        if clock.phase.isStudy && !clock.isPaused && !timerOnly {
             scorer = FocusScorer(params: .forSensitivity(sensitivity), start: now.timeIntervalSinceReferenceDate)
             focus = 100
             calibrating = true
             startCamera()
         } else {
             scorer = nil
+            cameraGeneration += 1
             cameraService.stop()
             camera = .off
             calibrating = false
@@ -258,8 +301,10 @@ final class AppModel: ObservableObject {
 
     private func startCamera() {
         camera = .starting
+        cameraGeneration += 1
+        let generation = cameraGeneration
         cameraService.start { [weak self] status in
-            guard let self else { return }
+            guard let self, generation == self.cameraGeneration else { return }
             // The phase may have ended while the camera was starting.
             if self.scorer == nil { self.cameraService.stop(); self.camera = .off } else { self.camera = status }
         }
@@ -287,6 +332,7 @@ final class AppModel: ObservableObject {
         d.set(config.rounds, forKey: "rounds")
         d.set(sensitivity, forKey: "sensitivity")
         d.set(showPreview, forKey: "showPreview")
+        d.set(useCamera, forKey: "useCamera")
         d.set(soundsOn, forKey: "soundsOn")
         d.set(musicOn, forKey: "musicOn")
         d.set(seenHint, forKey: "seenHint")

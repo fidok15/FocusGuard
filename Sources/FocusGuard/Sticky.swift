@@ -87,23 +87,29 @@ struct SettingsNote: View {
             Text("settings").font(Ink.hand(13))
                 .overlay(alignment: .bottom) { WavyLine(seed: 3).stroke(Ink.pencil.opacity(0.8), lineWidth: 1).frame(height: 3).offset(y: 3) }
                 .padding(.bottom, 4)
-            Text("alert sensitivity").font(Ink.hand(11))
+            Text("alert sensitivity").font(Ink.hand(12))
             HandSlider(value: $model.sensitivity)
             HStack {
                 Text("gentle")
                 Spacer()
                 Text("sensitive")
-            }.font(Ink.hand(11))
+            }.font(Ink.hand(12))
             VStack(alignment: .leading, spacing: 1) {
-                BoxChoice(title: "camera preview", checked: model.showPreview) { model.showPreview.toggle() }
-                BoxChoice(title: "sounds", checked: model.soundsOn) { model.soundsOn.toggle() }
-                BoxChoice(title: "launch at login", checked: model.launchAtLogin) { model.launchAtLogin.toggle() }
+                BoxChoice(title: "use camera", checked: model.useCamera, size: 12) { model.useCamera.toggle() }
+                if model.useCamera {
+                    BoxChoice(title: "camera preview", checked: model.showPreview, size: 12) { model.showPreview.toggle() }
+                }
+                BoxChoice(title: "sounds", checked: model.soundsOn, size: 12) { model.soundsOn.toggle() }
+                BoxChoice(title: "launch at login", checked: model.launchAtLogin, size: 12) { model.launchAtLogin.toggle() }
+                if let note = model.loginNote {
+                    Text(note).font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(.top, 4)
         }
         .foregroundStyle(Ink.pencil)
         .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 12)
-        .frame(width: 190, alignment: .leading)
+        .frame(width: 196, alignment: .leading)
         .background {
             CurledNote()
                 .fill(LinearGradient(colors: [Color(red: 0.98, green: 0.91, blue: 0.52), Ink.sticky], startPoint: .top, endPoint: .bottom))

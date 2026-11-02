@@ -145,19 +145,24 @@ struct PressStyle: ButtonStyle {
     }
 }
 
-/// Keyboard focus for the hand-drawn controls: Tab moves between them, Return activates, and the focused one gets a pencil box.
+/// Keyboard focus for the hand-drawn controls: Tab moves between them, Return or space activates, and the focused one gets a pencil box
+/// (only once Tab was used, so mouse users never see it).
 private struct PencilFocus: ViewModifier {
     let action: () -> Void
 
     /// Lives inside the focusable view, so `isFocused` reflects it.
     private struct Ring: View {
         @Environment(\.isFocused) private var focused
+        @EnvironmentObject var model: AppModel
 
         var body: some View {
-            if focused {
-                DoodleBox().stroke(Ink.pencil.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-                    .padding(-2).allowsHitTesting(false)
+            Group {
+                if focused && model.usingKeyboard {
+                    DoodleBox().stroke(Ink.pencil.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                        .padding(-2).allowsHitTesting(false)
+                }
             }
+            .onChange(of: focused) { model.controlFocused = $1 }
         }
     }
 
@@ -167,6 +172,7 @@ private struct PencilFocus: ViewModifier {
             .focusable()
             .focusEffectDisabled()
             .onKeyPress(.return) { action(); return .handled }
+            .onKeyPress(.space) { action(); return .handled }
     }
 }
 
