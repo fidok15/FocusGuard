@@ -175,6 +175,7 @@ public final class FocusScorer {
 
         if let since = absentSince {
             guard !absentAlerted, t - since >= Knobs.absentAlertAfter else { return nil }
+            if let lastAlert, t - lastAlert < params.cooldown { return nil } // stepping in and out of frame must not nag
             absentAlerted = true
             // Shares the cooldown on purpose: coming back to a low score must not pop a second bubble right away.
             lastAlert = t

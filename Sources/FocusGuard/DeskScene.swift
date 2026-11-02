@@ -175,14 +175,14 @@ struct DeskScene: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
-            QuitButton().position(x: 622, y: 52) // on the top-right corner of the room
-
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
                 SettingsNote()
                     .position(x: 128, y: 136)
                     .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
+
+            QuitButton().position(x: 622, y: 52) // on the top-right corner of the room, above the note's tap catcher
         }
         .frame(width: W, height: H)
         .fixedSize()

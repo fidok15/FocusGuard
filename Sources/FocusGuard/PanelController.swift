@@ -20,20 +20,21 @@ final class FloatingPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { onCancel() }
 }
 
-/// ⌥⌘F anywhere toggles the panel. Carbon hot keys need no Accessibility permission.
+/// ⌃⌥⌘F anywhere toggles the panel. Carbon hot keys need no Accessibility permission.
 @MainActor private var hotKeyAction: (() -> Void)?
 
 @MainActor
 private func registerHotKey(_ action: @escaping () -> Void) {
     hotKeyAction = action
     var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-    InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+    let installed = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
         DispatchQueue.main.async { MainActor.assumeIsolated { hotKeyAction?() } }
         return noErr
     }, 1, &spec, nil, nil)
     var ref: EventHotKeyRef?
-    RegisterEventHotKey(UInt32(kVK_ANSI_F), UInt32(optionKey | cmdKey), EventHotKeyID(signature: OSType(0x46474B59), id: 1),
-                        GetApplicationEventTarget(), 0, &ref)
+    let registered = RegisterEventHotKey(UInt32(kVK_ANSI_F), UInt32(controlKey | optionKey | cmdKey),
+                                         EventHotKeyID(signature: OSType(0x46474B59), id: 1), GetApplicationEventTarget(), 0, &ref)
+    if installed != noErr || registered != noErr { NSLog("FocusGuard: hot key not available (install \(installed), register \(registered))") }
 }
 
 /// Our own status item and the panel anchored under it. Replaces MenuBarExtra, which cannot be made
@@ -66,7 +67,7 @@ final class PanelController: NSObject {
         host.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentView = host
         panel.onShortcut = { [weak self] in self?.handle($0) ?? false }
-        panel.onCancel = { [weak self] in self?.hide() }
+        panel.onCancel = { [weak self] in self?.escape() }
         model.closePanel = { [weak self] in self?.hide() }
 
         if let button = item.button {
@@ -167,6 +168,15 @@ final class PanelController: NSObject {
         panel.setFrameOrigin(CGPoint(x: x, y: itemFrame.minY - size.height))
     }
 
+    /// Esc steps back one layer (note, confirm, camera card, setup) before it closes the panel.
+    private func escape() {
+        if model.showSettings { model.showSettings = false }
+        else if model.confirmStop { model.confirmStop = false }
+        else if model.showCameraWhy { model.showCameraWhy = false }
+        else if model.showSetup { model.showSetup = false }
+        else { hide() }
+    }
+
     /// Space, Esc, ⌘Q and ⌘, while the panel has the keyboard. Returns true when the event is used.
     private func handle(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -179,7 +189,7 @@ final class PanelController: NSObject {
         }
         guard flags.isEmpty else { return false }
         switch event.keyCode {
-        case 53: hide(); return true // esc
+        case 53: escape(); return true
         case 48: model.usingKeyboard = true; return false // tab: let SwiftUI move the focus
         case 49: // space
             if model.usingKeyboard && model.controlFocused { return false } // the focused control gets it

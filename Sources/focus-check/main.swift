@@ -101,6 +101,11 @@ func everyFourthBreakIsLong() {
     check(clock.breakMinutes(after: 4) == 30)
 }
 
+func absenceRespectsCooldown() {
+    // Present, gone 25 s, back for 5 s, gone again for 25 s: the second absence is inside the 180 s cooldown.
+    check(run(until: 120) { t in (10..<35).contains(t) || (40..<65).contains(t) ? .noFace : look } == [.absent])
+}
+
 func absentIsNotCountedBeforeFirstFace() {
     let scorer = FocusScorer(params: .standard, start: 0)
     for i in 0...600 { check(scorer.process(.noFace, at: Double(i) / fps) == nil) } // 60 s at an empty chair
@@ -256,6 +261,7 @@ let checks: [(String, () -> Void)] = [
     ("lcdDigitsAndText", lcdDigitsAndText),
     ("phaseAnnouncements", phaseAnnouncements),
     ("everyFourthBreakIsLong", everyFourthBreakIsLong),
+    ("absenceRespectsCooldown", absenceRespectsCooldown),
     ("absentIsNotCountedBeforeFirstFace", absentIsNotCountedBeforeFirstFace),
 ]
 for (name, body) in checks {

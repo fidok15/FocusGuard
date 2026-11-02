@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 
 /// Always-visible way out: menu bar apps have no Dock icon or app menu. Washi tape across the corner with a pencil ×. Also bound to ⌘Q.
@@ -101,7 +102,12 @@ struct SettingsNote: View {
                 }
                 BoxChoice(title: "sounds", checked: model.soundsOn, size: 12) { model.soundsOn.toggle() }
                 BoxChoice(title: "launch at login", checked: model.launchAtLogin, size: 12) { model.launchAtLogin.toggle() }
-                if let note = model.loginNote {
+                if model.loginApproval {
+                    Button(action: SMAppService.openSystemSettingsLoginItems) {
+                        Text("allow it in System Settings, Login Items").font(Ink.hand(11)).foregroundStyle(Ink.red)
+                            .underline().fixedSize(horizontal: false, vertical: true)
+                    }.buttonStyle(.plain)
+                } else if let note = model.loginNote {
                     Text(note).font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
                 }
             }

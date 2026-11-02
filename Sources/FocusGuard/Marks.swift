@@ -162,12 +162,14 @@ private struct PencilFocus: ViewModifier {
                         .padding(-2).allowsHitTesting(false)
                 }
             }
-            .onChange(of: focused) { model.controlFocused = $1 }
+            .onChange(of: focused) { model.focusedControls += $1 ? 1 : -1 }
+            .onDisappear { if focused { model.focusedControls -= 1 } } // the card went away with the focused control
         }
     }
 
     func body(content: Content) -> some View {
         content
+            .focusable(false) // a Button is focusable by itself with Full Keyboard Access: one Tab stop per control, not two
             .overlay { Ring() }
             .focusable()
             .focusEffectDisabled()

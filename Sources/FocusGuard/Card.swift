@@ -194,10 +194,22 @@ private struct CardContent: View {
                 RuledRow(height: 20) { Text("click the clock to").font(Ink.hand(12)) }
                 RuledRow(height: 20, seed: 1) { Text("start a study session").font(Ink.hand(12)) }
                 RuledRow(height: 20, seed: 2) { SummaryLine() }
-                RuledRow(height: 22, seed: 3) { WordLink(title: "adjust", size: 12) { model.showSetup = true } }
+                RuledRow(height: 22, seed: 3) {
+                    HStack {
+                        WordLink(title: "adjust", size: 12) { model.showSetup = true }
+                        Spacer(minLength: 4)
+                        WordLink(title: "start", size: 12, underlined: true, action: model.requestStart)
+                    }
+                }
             default:
                 RuledRow(height: 20) { SummaryLine() }
-                RuledRow(height: 22, seed: 1) { WordLink(title: "adjust", size: 12) { model.showSetup = true } }
+                RuledRow(height: 22, seed: 1) {
+                    HStack {
+                        WordLink(title: "adjust", size: 12) { model.showSetup = true }
+                        Spacer(minLength: 4)
+                        WordLink(title: "start", size: 12, underlined: true, action: model.requestStart)
+                    }
+                }
             }
         }
         .foregroundStyle(Ink.pencil)

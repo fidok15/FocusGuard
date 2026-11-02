@@ -38,7 +38,7 @@ Camera frames are analyzed in memory on your Mac with Apple's Vision framework, 
 
 To quit, click the washi-tape × on the top-right corner of the room, press ⌘Q while the panel is open, or use Quit in the right-click menu of the menu bar icon.
 
-Press **⌥⌘F** anywhere to open or close the panel (no Accessibility permission needed). Right-click the menu bar icon for start/pause, stop, settings and quit. Every 4th break is three times as long (at most 30 minutes). To use FocusGuard as a plain timer, untick *use camera* on the settings sticky note.
+Press **⌃⌥⌘F** anywhere to open or close the panel (no Accessibility permission needed). Right-click the menu bar icon for start/pause, stop, settings and quit. In a session with more than 4 rounds, the break after round 4 is three times as long (at most 30 minutes). To use FocusGuard as a plain timer, untick *use camera* on the settings sticky note.
 
 Requires macOS 14 or later.
 

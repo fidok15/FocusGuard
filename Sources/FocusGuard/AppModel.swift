@@ -27,16 +27,26 @@ final class AppModel: ObservableObject {
     @Published var timerOnly = false
     /// Why launch at login could not be set, shown on the settings note.
     @Published var loginNote: String?
+    /// Launch at login is registered but waits for the user's approval in System Settings.
+    @Published var loginApproval = false
     /// True once Tab was used, so the pencil focus box shows only for keyboard navigation.
     @Published var usingKeyboard = false
     /// A pencil control has keyboard focus: space then belongs to it.
-    var controlFocused = false
+    var focusedControls = 0
+    var controlFocused: Bool { focusedControls > 0 }
     var panelOpen = false
 
     @Published var config: SessionConfig { didSet { save() } }
     @Published var sensitivity: Double { didSet { save(); scorer?.params = .forSensitivity(sensitivity) } }
     @Published var showPreview: Bool { didSet { save() } }
-    @Published var useCamera: Bool { didSet { save() } }
+    @Published var useCamera: Bool {
+        didSet {
+            save()
+            guard clock.phase.isRunning, useCamera == timerOnly else { return }
+            timerOnly = !useCamera // the switch must take effect now: stop the camera, or start it for the running phase
+            phaseChanged()
+        }
+    }
     @Published var soundsOn: Bool { didSet { save() } }
     @Published var musicOn: Bool { didSet { save() } }
     @Published var launchAtLogin: Bool {
@@ -44,8 +54,8 @@ final class AppModel: ObservableObject {
             guard !syncingLogin, launchAtLogin != oldValue else { return }
             do {
                 if launchAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                loginNote = SMAppService.mainApp.status == .requiresApproval
-                    ? String(localized: "allow it in System Settings, Login Items") : nil
+                loginNote = nil
+                loginApproval = SMAppService.mainApp.status == .requiresApproval
             } catch { // not running from an app bundle (swift run), or the user removed it in System Settings
                 syncLogin()
                 loginNote = String(localized: "only works from the installed app")
@@ -229,6 +239,7 @@ final class AppModel: ObservableObject {
         syncingLogin = true
         launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
         syncingLogin = false
+        loginApproval = SMAppService.mainApp.status == .requiresApproval
     }
 
     func panelClosed() {
@@ -275,7 +286,7 @@ final class AppModel: ObservableObject {
         case .allDone: (text, sound) = (String(localized: "All done, nice work! ♡"), "Glass")
         }
         if soundsOn { NSSound(named: sound)?.play() }
-        Bubble.show(text, cat: timeOfDay.art.catFace)
+        if !panelOpen { Bubble.show(text, cat: timeOfDay.art.catFace) } // the open panel's card already says it
     }
 
     /// Camera runs only while actively studying.
