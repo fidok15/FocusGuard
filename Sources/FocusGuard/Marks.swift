@@ -110,7 +110,7 @@ struct Num: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Text(verbatim: text).opacity(0.25).offset(x: 0.4, y: 0.4)
+            Text(verbatim: text).opacity(0.25).offset(x: 0.4, y: 0.4).accessibilityHidden(true)
             Text(verbatim: text)
         }
         .font(Ink.num(size))
@@ -196,6 +196,7 @@ struct PencilTap: View {
                     Scribble().trim(from: 0, to: hover.value ? 1 : 0)
                         .stroke(Ink.pencil.opacity(0.75), lineWidth: 0.9).frame(width: 9, height: 2.5).offset(y: 1)
                 }
+                .padding(.horizontal, 4).padding(.vertical, 2) // a 21 × 21 target around the small glyph
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -255,6 +256,8 @@ struct BoxChoice: View {
         }
         .buttonStyle(PressStyle())
         .pencilFocus(action)
+        .accessibilityAddTraits(checked == true ? .isSelected : [])
+        .accessibilityValue(checked.map { $0 ? Text("on") : Text("off") } ?? Text(verbatim: ""))
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.2), value: hover.value)
         .animation(.easeOut(duration: 0.2), value: checked)

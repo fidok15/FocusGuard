@@ -218,6 +218,10 @@ private struct Hotspot: View {
         .onDisappear { if hover.value { NSCursor.pop(); hover.value = false } }
         .onTapGesture(perform: action)
         .help(help)
+        .accessibilityElement()
+        .accessibilityLabel(Text(help))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { action() }
     }
 }
 
@@ -555,7 +559,7 @@ private struct RecordSpin: View {
     let image: NSImage?
     let props: Props
 
-    private var spinning: Bool { model.musicOn && !(calmMotion && model.clock.phase.isStudy) }
+    private var spinning: Bool { model.musicOn && !calmMotion }
 
     var body: some View {
         if spinning, let image {

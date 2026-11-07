@@ -127,7 +127,13 @@ private struct CardContent: View {
                 RuledRow(height: 22, seed: 2) {
                     if model.showsFocus { Sparkline(values: model.history.suffix(40) + [model.focus]).frame(height: 16) }
                 }
-                RuledRow(height: 18, seed: 3) { StatusLine() }
+                RuledRow(height: 18, seed: 3) {
+                    if let nudge = model.nudgeText {
+                        Text(verbatim: nudge).font(Ink.hand(11)).foregroundStyle(Ink.red).lineLimit(1).minimumScaleFactor(0.75)
+                    } else {
+                        StatusLine()
+                    }
+                }
             case "rest":
                 if case .rest(let round) = model.clock.phase {
                     PhaseHeader(title: model.clock.isLongBreak ? "long break \(round) of \(model.clock.config.rounds)"
@@ -159,7 +165,7 @@ private struct CardContent: View {
                     HStack {
                         WordLink(title: "okay, start", size: 12, underlined: true, action: model.confirmCameraWhy)
                         Spacer(minLength: 4)
-                        WordLink(title: "not now", size: 11, action: model.startWithoutCamera)
+                        WordLink(title: "timer only", size: 11, action: model.startWithoutCamera)
                     }
                 }
             case "done":
@@ -189,7 +195,13 @@ private struct CardContent: View {
                         Text("\(model.clock.config.rounds) rounds").font(Ink.hand(12))
                     }
                 }
-                RuledRow(height: 18, seed: 3) { WordLink(title: "new session", size: 12, underlined: true, action: model.requestStart) }
+                RuledRow(height: 18, seed: 3) {
+                    HStack {
+                        WordLink(title: "adjust", size: 12) { model.showSetup = true }
+                        Spacer(minLength: 4)
+                        WordLink(title: "new session", size: 12, underlined: true, action: model.requestStart)
+                    }
+                }
             case "hint":
                 RuledRow(height: 20) { Text("click the clock to").font(Ink.hand(12)) }
                 RuledRow(height: 20, seed: 1) { Text("start a study session").font(Ink.hand(12)) }
@@ -216,7 +228,7 @@ private struct CardContent: View {
     }
 
     private var pausedLine: String {
-        model.pausedBySleep ? String(localized: "paused, your Mac slept") : String(localized: "paused, space to resume")
+        model.pausedBySleep ? String(localized: "paused while you were away") : String(localized: "paused, space to resume")
     }
 }
 
@@ -252,7 +264,7 @@ private struct StatusLine: View {
     var body: some View {
         Group {
             if model.clock.isPaused {
-                Text(model.pausedBySleep ? "paused, your Mac slept" : "paused, space to resume")
+                Text(model.pausedBySleep ? "paused while you were away" : "paused, space to resume")
             } else if model.timerOnly {
                 Text("timer only, no camera")
             } else {
@@ -261,6 +273,7 @@ private struct StatusLine: View {
                 case .unavailable: Text("camera unavailable, retrying…")
                 case .starting: Text("starting camera…")
                 case .running where model.calibrating: Text("calibrating, look ahead…")
+                case .running where model.focusStale: Text("can't see your eyes clearly")
                 case .running, .off: Text("camera on, stays on this Mac")
                 }
             }
@@ -286,6 +299,7 @@ private struct StepRow: View {
                 Text(label).font(Ink.hand(12)).foregroundStyle(Ink.pencil)
                 Spacer(minLength: 4)
                 PencilTap(glyph: "−") { value = max(range.lowerBound, value - step) }
+                    .accessibilityLabel(Text("less \(Text(label))"))
                 ZStack {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text(verbatim: "\(value)").font(Ink.hand(13)).monospacedDigit()
@@ -295,7 +309,9 @@ private struct StepRow: View {
                     LooseEllipse(seed: seed).stroke(Ink.pencil.opacity(0.7), lineWidth: 0.9).padding(.vertical, 1)
                 }
                 .frame(width: 44, height: 20)
+                .accessibilityElement(children: .combine)
                 PencilTap(glyph: "+") { value = min(range.upperBound, value + step) }
+                    .accessibilityLabel(Text("more \(Text(label))"))
             }
         }
     }
@@ -327,5 +343,8 @@ struct Sparkline: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)), with: .color(low ? Ink.red : Ink.pencil))
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel(Text("focus history"))
+        .accessibilityValue(values.last.map { Text(verbatim: "\(Int($0)) %") } ?? Text(verbatim: ""))
     }
 }

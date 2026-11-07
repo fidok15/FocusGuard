@@ -9,11 +9,12 @@ import SwiftUI
 enum DebugWindow {
     static var window: NSWindow?
 
-    /// States: idle (default), hint, setup, why, study, paused, settings, break, confirm, done, bubble, music, preview.
+    /// States: idle (default), hint, setup, why, study, paused, sleep, settings, break, confirm, done, bubble, music, nudge.
     static func configure(_ model: AppModel) {
+        model.persists = false // fixtures never touch the user's settings
         let args = CommandLine.arguments
         model.timeOverride = TimeOfDay.allCases.first { args.contains("\($0)") }
-        let state = args.firstIndex(of: "--state").map { args[$0 + 1] } ?? "idle"
+        let state = args.firstIndex(of: "--state").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? "idle"
         let t0 = Date()
         model.seenHint = state != "hint"
         model.cameraExplained = true
@@ -22,10 +23,11 @@ enum DebugWindow {
         model.showPreview = false
         if state == "setup" { model.showSetup = true }
         if state == "why" { model.cameraExplained = false; model.showCameraWhy = true }
-        if ["study", "paused", "sleep", "settings", "break", "done", "confirm"].contains(state) {
-            model.start()
-            model.cameraService.stop()
+        if ["study", "paused", "sleep", "settings", "break", "done", "confirm", "nudge"].contains(state) {
+            model.start(withCamera: false) // no capture and no permission prompt; the card is told the camera runs
+            model.timerOnly = false
             model.camera = .running
+            model.lastSignal = .distantFuture; model.lastScored = .distantFuture // keep the camera watchdog quiet
             model.history = [94, 90, 84, 66, 48, 58, 76, 88, 72, 52, 64, 82, 91, 86]
             model.focus = 82
             model.calibrating = false
@@ -34,6 +36,7 @@ enum DebugWindow {
         if state == "paused" || state == "sleep" { model.togglePause(); model.pausedBySleep = state == "sleep" }
         if state == "settings" { model.showSettings = true }
         if state == "confirm" { model.confirmStop = true }
+        if state == "nudge" { model.nudgeText = Lines.random(for: .lowFocus) }
         if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)); model.now = t0.addingTimeInterval(27 * 60) }
         if state == "done" { model.clock.tick(at: t0.addingTimeInterval(24 * 3600)); model.nudges = 2 }
         if state == "bubble" {
@@ -79,21 +82,24 @@ enum Snapshots {
     static func render(to dir: String) {
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let model = AppModel()
+        model.persists = false
         model.seenHint = true
         let t0 = Date()
         func shot(_ name: String, _ tod: TimeOfDay) {
             model.timeOverride = tod
             let renderer = ImageRenderer(content: PanelRoot().environmentObject(model))
             renderer.scale = 2
-            guard let cg = renderer.cgImage else { return print("failed \(name)") }
-            try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/\(name).png"))
+            guard let cg = renderer.cgImage,
+                  let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]),
+                  (try? png.write(to: URL(fileURLWithPath: "\(dir)/\(name).png"))) != nil
+            else { return print("failed \(name)") }
             print("wrote \(name)")
         }
         shot("1-idle-morning", .morning)
         model.showSetup = true
         shot("2-setup-day", .day)
-        model.start()
-        model.cameraService.stop()
+        model.start(withCamera: false)
+        model.timerOnly = false
         model.camera = .running
         model.history = [94, 90, 84, 66, 48, 58, 76, 88, 72, 52, 64, 82, 91, 86]
         model.focus = 82

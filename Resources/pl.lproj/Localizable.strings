@@ -24,8 +24,8 @@
 "starting camera…" = "włączam kamerę…";
 "camera on, stays on this Mac" = "kamera tylko na tym Macu";
 "alert sensitivity" = "czułość przypomnień";
-"gentle" = "rzadko";
-"sensitive" = "często";
+"gentle" = "łagodnie";
+"sensitive" = "czujnie";
 "camera preview" = "podgląd kamery";
 "Quit FocusGuard" = "Zamknij FocusGuard";
 "prrr~" = "mrrr~";
@@ -39,7 +39,6 @@
 "Music" = "Muzyka";
 "paused" = "pauza";
 "paused, space to resume" = "pauza, spacja wznawia";
-"paused, your Mac slept" = "pauza, Mac spał";
 "click the clock to" = "kliknij zegar,";
 "start a study session" = "żeby zacząć naukę";
 "adjust" = "zmień";
@@ -47,7 +46,6 @@
 "about the camera" = "o kamerze";
 "FocusGuard looks at you through the camera only while you study. Nothing is saved or sent anywhere." = "FocusGuard patrzy na Ciebie przez kamerę tylko podczas nauki. Nic nie jest zapisywane ani wysyłane.";
 "okay, start" = "dobrze, zaczynam";
-"not now" = "nie teraz";
 "sounds" = "dźwięki";
 "launch at login" = "uruchom przy logowaniu";
 "%lld min, %lld min break, %lld rounds" = "%lld min, przerwa %lld, rundy %lld";
@@ -69,3 +67,11 @@
 "Pause" = "Pauza";
 "Resume" = "Wznów";
 "Stop session" = "Zakończ sesję";
+"timer only" = "sam zegar";
+"paused while you were away" = "pauza, nie było Cię";
+"can't see your eyes clearly" = "nie widzę dobrze Twoich oczu";
+"less %@" = "mniej: %@";
+"more %@" = "więcej: %@";
+"focus history" = "historia skupienia";
+"on" = "włączone";
+"off" = "wyłączone";

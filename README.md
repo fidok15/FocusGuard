@@ -4,20 +4,20 @@
 
 A cozy lofi study timer that lives in your Mac's menu bar. While you study, it uses the webcam and Apple's on-device face models to estimate your focus. When your focus drops for real, not for a second, you get a gentle nudge.
 
-![FocusGuard while studying](docs/screenshots/study.jpg)
+![FocusGuard while studying](docs/screenshots/study.png)
 
 | Set up a session | Session summary | A nudge |
 | --- | --- | --- |
-| ![Setup](docs/screenshots/setup.jpg) | ![Summary](docs/screenshots/summary.jpg) | ![Bubble](docs/screenshots/bubble.png) |
+| ![Setup](docs/screenshots/setup.png) | ![Summary](docs/screenshots/summary.png) | ![Bubble](docs/screenshots/bubble.png) |
 
 ## Features
 
 - **Menu bar app.** Click the timer icon in the menu bar to open a hand-drawn desk scene. The time of day outside the window follows your clock: morning, day, sunset, or night.
-- **Pomodoro timer.** Click the kitchen timer on the desk, then set study length, break length, and rounds in the notebook.
-- **Focus estimate.** During study phases the camera measures eye openness, gaze, and head pose. The notebook shows your focus percentage and a pencil-drawn chart.
-- **No spam.** A nudge needs a sustained drop. A one-second dip never triggers one, and a cooldown keeps reminders rare. Sensitivity is one slider (the sticky note).
+- **Pomodoro timer.** Click the desk clock to start. The paper card above it shows the session; "adjust" sets study length, break length, and rounds. Space pauses, Esc steps back, ⌃⌥⌘F opens the panel from anywhere, and right-clicking the menu bar icon gives a small menu.
+- **Focus estimate.** During study phases the camera measures eye openness, gaze, and head pose. The card shows an estimated focus percentage and a pencil-drawn chart. When the camera can't see your eyes clearly, the figure is hidden instead of guessed.
+- **No spam.** A nudge (a speech bubble from the cat, or a red line on the open card, with a soft sound if sounds are on) needs a sustained drop. A one-second dip never triggers one, and a cooldown keeps reminders rare. Sensitivity is one slider (the sticky note).
 - **Camera only while studying.** The camera is off during breaks, while paused, and when no session is running.
-- **Pet the cat.** Click or stroke the cat for hearts and a purr. The cat breathes, and the coffee steams.
+- **Pet the cat.** Click or stroke the cat for hearts and a written prrr~. The cat breathes, the coffee steams, and clicking the record player spins the record (no audio). Reduce Motion stops the decorative motion.
 - English and Polish.
 
 ## Privacy

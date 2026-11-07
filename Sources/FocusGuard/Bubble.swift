@@ -19,7 +19,7 @@ enum Bubble {
         p.hasShadow = false
         p.level = .statusBar
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        p.contentView = NSHostingView(rootView: BubbleView(text: text, cat: cat) { hide(p) })
+        p.contentView = NSHostingView(rootView: BubbleView(text: text, cat: cat) { [weak p] in if let p { hide(p) } }) // weak: the panel owns this view
         // Enter: fade in while dropping 8 pt from under the menu bar.
         let target = origin(for: size)
         p.setFrameOrigin(CGPoint(x: target.x, y: target.y + 8))

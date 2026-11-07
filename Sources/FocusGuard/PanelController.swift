@@ -164,8 +164,8 @@ final class PanelController: NSObject {
         let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: itemFrame.midX, y: itemFrame.midY)) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let size = panel.frame.size
-        let x = min(max(itemFrame.midX - size.width / 2, visible.minX + 4), visible.maxX - size.width - 4)
-        panel.setFrameOrigin(CGPoint(x: x, y: itemFrame.minY - size.height))
+        let x = max(min(itemFrame.midX - size.width / 2, visible.maxX - size.width - 4), visible.minX + 4) // narrow screen: keep the left side
+        panel.setFrameOrigin(CGPoint(x: x, y: max(itemFrame.minY - size.height, visible.minY)))
     }
 
     /// Esc steps back one layer (note, confirm, camera card, setup) before it closes the panel.
@@ -180,6 +180,7 @@ final class PanelController: NSObject {
     /// Space, Esc, ⌘Q and ⌘, while the panel has the keyboard. Returns true when the event is used.
     private func handle(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if event.keyCode == 48 { model.usingKeyboard = true; return false } // tab or shift-tab: let SwiftUI move the focus
         if flags == .command {
             switch event.charactersIgnoringModifiers {
             case "q": NSApp.terminate(nil); return true
@@ -190,9 +191,11 @@ final class PanelController: NSObject {
         guard flags.isEmpty else { return false }
         switch event.keyCode {
         case 53: escape(); return true
-        case 48: model.usingKeyboard = true; return false // tab: let SwiftUI move the focus
         case 49: // space
             if model.usingKeyboard && model.controlFocused { return false } // the focused control gets it
+            if event.isARepeat { return true } // holding space must not flip pause on and off
+            // Only the plain card answers space: a question or the note on top must not start or pause anything.
+            if model.showSettings || model.cardKey == "confirm" || model.cardKey == "why" { return true }
             model.spaceTapped(); return true
         default: return false
         }

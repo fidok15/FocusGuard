@@ -10,11 +10,12 @@ struct QuitButton: View {
         Button { NSApp.terminate(nil) } label: {
             ZStack {
                 WashiTape(width: 64, height: 20)
-                Path { p in
-                    p.move(to: CGPoint(x: -4.5, y: -4)); p.addLine(to: CGPoint(x: 4.2, y: 4.6))
-                    p.move(to: CGPoint(x: 4.6, y: -4.2)); p.addLine(to: CGPoint(x: -4.3, y: 4.4))
+                Path { p in // a 10 × 10 box, centred on the tape
+                    p.move(to: CGPoint(x: 0.5, y: 1)); p.addLine(to: CGPoint(x: 9.2, y: 9.6))
+                    p.move(to: CGPoint(x: 9.6, y: 0.8)); p.addLine(to: CGPoint(x: 0.7, y: 9.4))
                 }
                 .stroke(Ink.pencil, style: StrokeStyle(lineWidth: hover.value ? 2.2 : 1.8, lineCap: .round))
+                .frame(width: 10, height: 10)
                 .rotationEffect(.degrees(-45))
             }
             .contentShape(Rectangle())
@@ -27,6 +28,7 @@ struct QuitButton: View {
         .keyboardShortcut("q")
         .onHover { hover.value = $0 }
         .help("Quit FocusGuard")
+        .accessibilityLabel(Text("Quit FocusGuard"))
         .animation(.easeOut(duration: 0.15), value: hover.value)
     }
 }
@@ -77,6 +79,18 @@ private struct HandSlider: View {
             })
         }
         .frame(height: 18)
+        // Arrow keys and VoiceOver adjust it in tenths, like a native slider.
+        .pencilFocus {} // Tab stop with the same pencil box as the other controls
+        .onKeyPress(.leftArrow) { step(-0.1); return .handled }
+        .onKeyPress(.rightArrow) { step(0.1); return .handled }
+        .accessibilityElement()
+        .accessibilityLabel(Text("alert sensitivity"))
+        .accessibilityValue(Text(verbatim: "\(Int((value * 100).rounded())) %"))
+        .accessibilityAdjustableAction { $0 == .increment ? step(0.1) : step(-0.1) }
+    }
+
+    private func step(_ by: Double) {
+        value = min(max(((value + by) * 10).rounded() / 10, 0), 1)
     }
 }
 

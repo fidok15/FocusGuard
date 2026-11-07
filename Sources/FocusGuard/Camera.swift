@@ -45,6 +45,15 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
 
     private func run() -> CameraStatus {
         guard wanted else { return .off }
+        // The camera was unplugged: drop the dead input so the next start picks whatever camera is there now.
+        if configured, session.inputs.contains(where: { ($0 as? AVCaptureDeviceInput)?.device.isConnected == false }) {
+            if session.isRunning { session.stopRunning() }
+            session.beginConfiguration()
+            session.inputs.forEach(session.removeInput)
+            session.outputs.forEach(session.removeOutput)
+            session.commitConfiguration()
+            configured = false
+        }
         if !configured {
             guard let device = AVCaptureDevice.default(for: .video),
                   let input = try? AVCaptureDeviceInput(device: device),
@@ -55,7 +64,12 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             session.beginConfiguration()
             session.sessionPreset = .vga640x480
             session.addInput(input)
-            if session.canAddOutput(output) { session.addOutput(output) }
+            guard session.canAddOutput(output) else {
+                session.removeInput(input)
+                session.commitConfiguration()
+                return .unavailable
+            }
+            session.addOutput(output)
             session.commitConfiguration()
             configured = true
         }

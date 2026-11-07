@@ -96,7 +96,8 @@ public final class FocusScorer {
     private var absentAlerted = false
     private var belowSince: Double?
     private var lastAlert: Double?
-    private var lastFrame: Double?
+    /// Time of the last frame that counted (not skipped); the app hides the focus figure once this goes stale.
+    public private(set) var lastFrame: Double?
 
     public init(params: ScorerParams, start: Double) {
         self.params = params
@@ -111,10 +112,9 @@ public final class FocusScorer {
             closedSince = nil
             absentSince = nil
         }
-        lastFrame = t
-
         let state = classify(signals, at: t)
         guard state != .skipped else { return nil }
+        lastFrame = t // only frames that count: a long run of skipped ones is a gap too
 
         samples.append((t, state == .focused))
         while let first = samples.first, first.t < t - params.window { samples.removeFirst() }

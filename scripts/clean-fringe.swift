@@ -32,8 +32,12 @@ for path in CommandLine.arguments.dropFirst() {
         }
     }
     let out = ctx.makeImage()!
-    let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, "public.png" as CFString, 1, nil)!
+    guard let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, "public.png" as CFString, 1, nil) else {
+        FileHandle.standardError.write("\(path): cannot write\n".data(using: .utf8)!); exit(1)
+    }
     CGImageDestinationAddImage(dest, out, nil)
-    CGImageDestinationFinalize(dest)
+    guard CGImageDestinationFinalize(dest) else {
+        FileHandle.standardError.write("\(path): saving failed\n".data(using: .utf8)!); exit(1)
+    }
     print("\(path): erased \(erased), tinted \(tinted)")
 }

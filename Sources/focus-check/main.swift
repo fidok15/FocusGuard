@@ -236,7 +236,21 @@ func phaseAnnouncements() {
     check(Phase.study(round: 1).announcement(to: .idle) == nil)
 }
 
+/// Unusable frames between two distractions must not let the first one's hold carry over.
+func lowConfidenceStretchResetsHold() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    var blurry = look; blurry.confidence = 0.1
+    var first: Double?
+    for i in 0...Int(200 * fps) {
+        let t = Double(i) / fps
+        let s = (100..<120).contains(t) || t >= 130 ? away : (120..<130).contains(t) ? blurry : look
+        if scorer.process(s, at: t) != nil, first == nil { first = t }
+    }
+    check((first ?? 0) >= 139)
+}
+
 let checks: [(String, () -> Void)] = [
+    ("lowConfidenceStretchResetsHold", lowConfidenceStretchResetsHold),
     ("noInstantAlertAfterFrameGap", noInstantAlertAfterFrameGap),
     ("delayedCalibrationStillWorks", delayedCalibrationStillWorks),
     ("calibrationUsesMedian", calibrationUsesMedian),

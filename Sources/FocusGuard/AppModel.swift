@@ -14,6 +14,10 @@ final class AppModel: ObservableObject {
     @Published var calibrating = false
     @Published var camera: CameraStatus = .off
     @Published var alerting = false
+    /// The last focus reminder, shown on the open card for as long as the menu bar icon alerts.
+    @Published var nudgeText: String?
+    /// Frames still arrive but none could be scored for a while (face turned away, poor light): no figure beats a stale one.
+    @Published var focusStale = false
     @Published var showSetup = false
     @Published var showSettings = false
     @Published var confirmStop = false
@@ -35,6 +39,8 @@ final class AppModel: ObservableObject {
     var focusedControls = 0 { didSet { focusedControls = max(0, focusedControls) } } // onChange and onDisappear can both fire for one control
     var controlFocused: Bool { focusedControls > 0 }
     var panelOpen = false
+    /// Debug fixtures turn this off so they never overwrite the user's settings.
+    var persists = true
 
     @Published var config: SessionConfig { didSet { save() } }
     @Published var sensitivity: Double { didSet { save(); scorer?.params = .forSensitivity(sensitivity) } }
@@ -56,9 +62,11 @@ final class AppModel: ObservableObject {
                 if launchAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
                 loginNote = nil
                 loginApproval = SMAppService.mainApp.status == .requiresApproval
-            } catch { // not running from an app bundle (swift run), or the user removed it in System Settings
+            } catch {
                 syncLogin()
-                loginNote = String(localized: "only works from the installed app")
+                loginNote = Bundle.main.bundleURL.pathExtension == "app"
+                    ? error.localizedDescription
+                    : String(localized: "only works from the installed app") // swift run
             }
         }
     }
@@ -72,6 +80,9 @@ final class AppModel: ObservableObject {
     private var scorer: FocusScorer?
     private var lastSample = Date.distantPast
     private var lastCameraRetry = Date.distantPast
+    /// Last time the camera delivered a frame, and last time one of them counted for the score.
+    var lastSignal = Date.distantPast
+    var lastScored = Date.distantPast
     private var activity: NSObjectProtocol?
     private var timer: Timer?
     private var alertReset: DispatchWorkItem?
@@ -118,7 +129,7 @@ final class AppModel: ObservableObject {
     var timeOverride: TimeOfDay?
     /// Which card is showing above the clock; changing it plays the card's enter motion.
     var cardKey: String {
-        if confirmStop { return "confirm" }
+        if confirmStop && clock.phase.isRunning { return "confirm" }
         switch clock.phase {
         case .study: return "study"
         case .rest: return "rest"
@@ -138,7 +149,7 @@ final class AppModel: ObservableObject {
     var studiedMinutes: Int { clock.config.studyMinutes * clock.config.rounds }
     var averageFocus: Int? { history.isEmpty ? nil : Int(history.reduce(0, +) / Double(history.count)) }
     /// Focus figures need a running camera that has finished calibrating on a real face.
-    var showsFocus: Bool { !timerOnly && camera == .running && !calibrating }
+    var showsFocus: Bool { !timerOnly && camera == .running && !calibrating && !focusStale }
     var menuMood: MenuIcon.Mood {
         if alerting { return .alert }
         return clock.phase.isStudy && !clock.isPaused ? .studying : .idle
@@ -197,6 +208,7 @@ final class AppModel: ObservableObject {
     }
 
     func togglePause() {
+        tick() // a phase that ended since the last tick gets its announcement before the pause freezes the clock
         guard clock.phase.isRunning else { return }
         pausedBySleep = false
         if clock.isPaused { clock.resume(at: Date()) } else { clock.pause(at: Date()) }
@@ -263,15 +275,27 @@ final class AppModel: ObservableObject {
             now = date
             phaseChanged()
             phaseStart = date
+            if !clock.phase.isRunning { confirmStop = false } // the question is moot once the session finished
             if let announcement = before.announcement(to: clock.phase) { announce(announcement) }
         }
         guard clock.phase.isStudy, !clock.isPaused else { return }
+        if camera == .running {
+            // No frames at all: the camera was unplugged or stalled. Stop it and let the retry below bring it back.
+            if date.timeIntervalSince(lastSignal) > 6 {
+                cameraGeneration += 1
+                cameraService.stop()
+                camera = .unavailable
+                lastCameraRetry = date
+            }
+            focusStale = !calibrating && date.timeIntervalSince(lastScored) > 4
+        }
         if showsFocus, now.timeIntervalSince(lastSample) >= 5 {
             history.append(focus)
             lastSample = now
         }
-        // Camera unplugged or busy: retry every 5 s.
-        if camera == .unavailable, !timerOnly, now.timeIntervalSince(lastCameraRetry) >= 5 {
+        // Camera unplugged or busy: retry every 5 s. Access granted in System Settings after a denial: start right away.
+        let granted = camera == .denied && AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+        if granted || camera == .unavailable, !timerOnly, now.timeIntervalSince(lastCameraRetry) >= 5 {
             lastCameraRetry = now
             startCamera()
         }
@@ -287,11 +311,21 @@ final class AppModel: ObservableObject {
         }
         if soundsOn { NSSound(named: sound)?.play() }
         if !panelOpen { Bubble.show(text, cat: timeOfDay.art.catFace) } // the open panel's card already says it
+        Self.speak(text)
+    }
+
+    /// VoiceOver reads reminders and phase changes aloud; the bubble panel never takes focus, so it would stay silent.
+    private static func speak(_ text: String) {
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
     }
 
     /// Camera runs only while actively studying.
     private func phaseChanged() {
         now = Date()
+        nudgeText = nil
+        alerting = false
+        focusStale = false
         if clock.phase.isStudy && !clock.isPaused && !timerOnly {
             scorer = FocusScorer(params: .forSensitivity(sensitivity), start: now.timeIntervalSinceReferenceDate)
             focus = 100
@@ -317,26 +351,36 @@ final class AppModel: ObservableObject {
         cameraService.start { [weak self] status in
             guard let self, generation == self.cameraGeneration else { return }
             // The phase may have ended while the camera was starting.
-            if self.scorer == nil { self.cameraService.stop(); self.camera = .off } else { self.camera = status }
+            if self.scorer == nil { self.cameraService.stop(); self.camera = .off; return }
+            self.camera = status
+            // The watchdog counts from here; the score stays stale until a frame actually counts.
+            if status == .running { self.lastSignal = Date() }
         }
     }
 
     private func handle(_ signals: FaceSignals, at t: Double) {
         guard let scorer else { return }
         let event = scorer.process(signals, at: t)
+        lastSignal = Date()
+        if scorer.lastFrame == t { lastScored = lastSignal }
         focus = scorer.smoothedScore
         calibrating = scorer.isCalibrating
         guard let event else { return }
+        let text = Lines.random(for: event)
         nudges += 1
         alerting = true
+        nudgeText = text
         alertReset?.cancel()
-        let reset = DispatchWorkItem { [weak self] in self?.alerting = false }
+        let reset = DispatchWorkItem { [weak self] in self?.alerting = false; self?.nudgeText = nil }
         alertReset = reset
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: reset)
-        if !panelOpen { Bubble.show(Lines.random(for: event), cat: timeOfDay.art.catFace) } // the open panel shows the alert cat
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: reset)
+        if soundsOn { NSSound(named: "Tink")?.play() }
+        if !panelOpen { Bubble.show(text, cat: timeOfDay.art.catFace) } // the open panel shows it on the card
+        Self.speak(text)
     }
 
     private func save() {
+        guard persists else { return }
         let d = UserDefaults.standard
         d.set(config.studyMinutes, forKey: "studyMinutes")
         d.set(config.breakMinutes, forKey: "breakMinutes")
