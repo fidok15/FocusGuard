@@ -148,6 +148,30 @@ struct PanelRoot: View {
 
 struct DeskScene: View {
     @EnvironmentObject var model: AppModel
+    /// The object under the pointer. macOS gives hover only to the topmost view under the pointer by its frame, not its
+    /// shape, and every hotspot spans the whole scene, so the scene itself decides by outline (see `hover(at:)`).
+    @StateObject private var hovered = Box<String?>(nil)
+
+    /// Hover targets, topmost first, matching the order the hotspots are stacked in below.
+    private func targets(_ tod: TimeOfDay) -> [(name: String, shape: OutlineShape, help: LocalizedStringKey)] {
+        [("record", OutlineShape(groups: [tod.props.record]), "Spotify: now playing"),
+         ("sticky", OutlineShape(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false), "Settings"),
+         ("mug", OutlineShape(groups: [tod.props.mug]), "Pause / resume"),
+         ("clock", OutlineShape(groups: [tod.props.clock]), "Start or stop a study session"),
+         ("cat", OutlineShape(groups: [tod.art.silhouette]), "Pet the cat")]
+    }
+
+    private func hover(at point: CGPoint?, _ tod: TimeOfDay) {
+        let frame = CGRect(x: 0, y: 0, width: W, height: H)
+        let notes = model.showSettings || model.showMusic // a note covers the room; its tap catcher takes the clicks
+        let name = notes ? nil : point.flatMap { p in targets(tod).first { $0.shape.path(in: frame).contains(p) }?.name }
+        guard name != hovered.value else { return }
+        if hovered.value != nil { NSCursor.pop() }
+        if let name { (name == "cat" ? NSCursor.openHand : NSCursor.pointingHand).push() }
+        hovered.value = name
+    }
+
+    private func lit(_ name: String) -> Bool { hovered.value == name || forcedHover?.contains(name) == true }
 
     var body: some View {
         let tod = model.timeOfDay
@@ -163,18 +187,18 @@ struct DeskScene: View {
             .id(tod)
             .transition(.opacity)
 
-            CatLayer(art: tod.art).id(tod)
+            CatLayer(art: tod.art, lit: lit("cat")).id(tod)
 
             RecordSpin(image: tod.art.image, props: tod.props).id(tod).allowsHitTesting(false)
             Steam().place(Spots.steam).allowsHitTesting(false)
             ClockDisplay().allowsHitTesting(false)
 
-            Hotspot(name: "clock", groups: [tod.props.clock], help: "Start or stop a study session", action: model.clockTapped)
-            Hotspot(name: "mug", groups: [tod.props.mug], help: "Pause / resume", action: model.togglePause)
-            Hotspot(name: "sticky", groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, help: "Settings") {
+            Hotspot(groups: [tod.props.clock], lit: lit("clock"), help: "Start or stop a study session", action: model.clockTapped)
+            Hotspot(groups: [tod.props.mug], lit: lit("mug"), help: "Pause / resume", action: model.togglePause)
+            Hotspot(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, lit: lit("sticky"), help: "Settings") {
                 model.toggleSettings()
             }
-            Hotspot(name: "record", groups: [tod.props.record], help: "Spotify: now playing", action: model.toggleMusic)
+            Hotspot(groups: [tod.props.record], lit: lit("record"), help: "Spotify: now playing", action: model.toggleMusic)
 
             if !model.showSettings && !model.showMusic { SessionCard() } // a note takes the card's place
 
@@ -200,6 +224,13 @@ struct DeskScene: View {
             CloseButton().position(x: 622, y: 52) // on the top-right corner of the room, above the notes' tap catchers
         }
         .frame(width: W, height: H)
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            if case .active(let p) = phase { hover(at: p, tod) } else { hover(at: nil, tod) }
+        }
+        .onChange(of: model.showSettings || model.showMusic) { hover(at: nil, tod) }
+        .onDisappear { hover(at: nil, tod) }
+        // The tooltip follows the object under the pointer (a per-hotspot .help would also go by frame).
+        .help(hovered.value.flatMap { name in targets(tod).first { $0.name == name }?.help } ?? "")
         .fixedSize()
         .coordinateSpace(name: "scene")
         .animation(.easeInOut(duration: 1.2), value: tod)
@@ -210,34 +241,27 @@ struct DeskScene: View {
     }
 }
 
-/// Invisible clickable area shaped exactly like an object in the art, with a soft glow on hover.
+/// Invisible clickable area shaped exactly like an object in the art, with a soft glow while the scene says it is hovered.
 private struct Hotspot: View {
-    let name: String
     let groups: [[CGPoint]]
     var smooth = true
+    let lit: Bool
     let help: LocalizedStringKey
     let action: () -> Void
-    @StateObject private var hover = Box(false)
 
     var body: some View {
         let shape = OutlineShape(groups: groups, smooth: smooth)
         ZStack {
-            HoverGlow(shape: shape, on: hover.value || forcedHover?.contains(name) == true)
+            HoverGlow(shape: shape, on: lit)
             shape.fill(Color.white.opacity(0.001))
         }
         .frame(width: W, height: H)
-        .contentShape(shape)
-        .onHover { inside in
-            hover.value = inside
-            inside ? NSCursor.pointingHand.push() : NSCursor.pop()
-        }
-        .onDisappear { if hover.value { NSCursor.pop(); hover.value = false } }
-        .onTapGesture(perform: action)
-        .help(help)
         .accessibilityElement()
         .accessibilityLabel(Text(help))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { action() }
+        .contentShape(shape) // clicks do go by shape
+        .onTapGesture(perform: action)
     }
 }
 
@@ -256,9 +280,9 @@ private var calmMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldRedu
 /// All motion is a pure function of the clock, so nothing can capture the window's own layout animation.
 private struct CatLayer: View {
     let art: SceneArt
+    let lit: Bool
     @StateObject private var pets = Box<[Pet]>([])
     @StateObject private var lastPoint = Box<CGPoint?>(nil)
-    @StateObject private var hovering = Box(false)
     @StateObject private var stroke = Box<CGFloat>(0)
 
     private var catShape: OutlineShape { OutlineShape(groups: [art.silhouette]) }
@@ -295,15 +319,11 @@ private struct CatLayer: View {
                 .allowsHitTesting(false)
             }
 
-            HoverGlow(shape: catShape, on: hovering.value || forcedHover?.contains("cat") == true)
+            HoverGlow(shape: catShape, on: lit)
             catShape.fill(Color.white.opacity(0.001))
-                .onHover { inside in
-                    hovering.value = inside
-                    inside ? NSCursor.openHand.push() : NSCursor.pop()
-                }
-                .onDisappear { if hovering.value { NSCursor.pop(); hovering.value = false } }
+                .contentShape(catShape)
                 .gesture(petting)
-                .help("Pet the cat")
+                .accessibilityLabel(Text("Pet the cat"))
 
             if !pets.value.isEmpty {
                 TimelineView(.animation(minimumInterval: 1 / 30)) { context in
