@@ -13,16 +13,18 @@ A cozy lofi study timer that lives in your Mac's menu bar. While you study, it u
 ## Features
 
 - **Menu bar app.** Click the timer icon in the menu bar to open a hand-drawn desk scene. The time of day outside the window follows your clock: morning, day, sunset, or night.
-- **Pomodoro timer.** Click the desk clock to start. The paper card above it shows the session; "adjust" sets study length, break length, and rounds. Space pauses, Esc steps back, ⌃⌥⌘F opens the panel from anywhere, and right-clicking the menu bar icon gives a small menu.
+- **Pomodoro timer.** Click the desk clock to start. The paper card above it shows the session; "adjust" sets study length, break length, and rounds. Space pauses, Esc steps back, ⌃⌥⌘F opens the panel from anywhere. The tape in the corner (or ⌘W) hides the panel; right-click the menu bar icon for Start, Stop, Settings, and Quit (or press ⌘Q).
 - **Focus estimate.** During study phases the camera measures eye openness, gaze, and head pose. The card shows an estimated focus percentage and a pencil-drawn chart. When the camera can't see your eyes clearly, the figure is hidden instead of guessed.
 - **No spam.** A nudge (a speech bubble from the cat, or a red line on the open card, with a soft sound if sounds are on) needs a sustained drop. A one-second dip never triggers one, and a cooldown keeps reminders rare. Sensitivity is one slider (the sticky note).
 - **Camera only while studying.** The camera is off during breaks, while paused, and when no session is running.
-- **Pet the cat.** Click or stroke the cat for hearts and a written prrr~. The cat breathes, the coffee steams, and clicking the record player spins the record (no audio). Reduce Motion stops the decorative motion.
+- **Pet the cat.** Click or stroke the cat for hearts and a written prrr~. The cat breathes, the coffee steams, and Reduce Motion stops the decorative motion.
+- **Spotify on the record player.** While Spotify plays, the record spins. Click the player to see the track, artist, and cover, and to play, pause, skip, shuffle, or repeat. macOS asks once to let FocusGuard control Spotify. FocusGuard never starts Spotify on its own.
+- **Bigger panel.** A setting on the sticky note draws everything 25 % larger. If another app already owns ⌃⌥⌘F, the note says so.
 - English and Polish.
 
 ## Privacy
 
-Camera frames are analyzed in memory on your Mac with Apple's Vision framework, then thrown away. Nothing is recorded, saved, or sent over the network. The app makes no network requests.
+Camera frames are analyzed in memory on your Mac with Apple's Vision framework, then thrown away. Nothing is recorded, saved, or sent over the network. The only network request the app makes is downloading the album cover of the song Spotify is playing, from Spotify's image server.
 
 ## Install
 

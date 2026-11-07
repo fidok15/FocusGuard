@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import FocusCore
 import SwiftUI
 
 /// `swift run FocusGuard --window [morning|day|sunset|night] [--state ...] [--hover ...] [--autopet]` shows the scene in a
@@ -9,17 +10,24 @@ import SwiftUI
 enum DebugWindow {
     static var window: NSWindow?
 
-    /// States: idle (default), hint, setup, why, study, paused, sleep, settings, break, confirm, done, bubble, music, nudge.
+    /// States: idle (default), hint, setup, why, study, paused, sleep, settings, break, confirm, done, bubble, music, nomusic, nudge.
+    /// `--large` draws the bigger panel.
     static func configure(_ model: AppModel) {
         model.persists = false // fixtures never touch the user's settings
         let args = CommandLine.arguments
         model.timeOverride = TimeOfDay.allCases.first { args.contains("\($0)") }
         let state = args.firstIndex(of: "--state").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? "idle"
-        let t0 = Date()
+        let t0 = Mono.now()
         model.seenHint = state != "hint"
+        model.largePanel = args.contains("--large")
         model.cameraExplained = true
         model.soundsOn = false
-        model.musicOn = state == "music"
+        if state == "music" {
+            model.spotify.preview(NowPlaying(playing: true, title: "Lofi Rain on the Window", artist: "Kitty Beats", shuffling: true),
+                                  artwork: model.timeOfDay.art.catFace)
+            model.showMusic = true
+        }
+        if state == "nomusic" { model.showMusic = true }
         model.showPreview = false
         if state == "setup" { model.showSetup = true }
         if state == "why" { model.cameraExplained = false; model.showCameraWhy = true }
@@ -28,16 +36,16 @@ enum DebugWindow {
             model.timerOnly = false
             model.camera = .running
             model.lastSignal = .distantFuture; model.lastScored = .distantFuture // keep the camera watchdog quiet
+            model.timeShift = 7 * 60
             model.history = [94, 90, 84, 66, 48, 58, 76, 88, 72, 52, 64, 82, 91, 86]
             model.focus = 82
             model.calibrating = false
-            model.now = t0.addingTimeInterval(7 * 60)
         }
         if state == "paused" || state == "sleep" { model.togglePause(); model.pausedBySleep = state == "sleep" }
         if state == "settings" { model.showSettings = true }
         if state == "confirm" { model.confirmStop = true }
         if state == "nudge" { model.nudgeText = Lines.random(for: .lowFocus) }
-        if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)); model.now = t0.addingTimeInterval(27 * 60) }
+        if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)); model.timeShift = 27 * 60 }
         if state == "done" { model.clock.tick(at: t0.addingTimeInterval(24 * 3600)); model.nudges = 2 }
         if state == "bubble" {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -49,8 +57,12 @@ enum DebugWindow {
     static func show() {
         let model = AppModel()
         configure(model)
-        let size = NSSize(width: CW + 2 * PAD, height: CH + 2 * PAD)
-        let w = NSWindow(contentRect: NSRect(origin: CGPoint(x: 200, y: 200), size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        model.closePanel = { NSApp.terminate(nil) } // the debug window is the whole app
+        let size = NSSize(width: panelSize.width * model.panelScale, height: panelSize.height * model.panelScale)
+        // Where the real panel opens: under the menu bar, toward the right where status items sit.
+        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let origin = CGPoint(x: screen.maxX - size.width - 120, y: screen.maxY - size.height)
+        let w = NSWindow(contentRect: NSRect(origin: origin, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
         w.isOpaque = false
         w.backgroundColor = .clear
         w.hasShadow = false
@@ -84,7 +96,7 @@ enum Snapshots {
         let model = AppModel()
         model.persists = false
         model.seenHint = true
-        let t0 = Date()
+        let t0 = Mono.now()
         func shot(_ name: String, _ tod: TimeOfDay) {
             model.timeOverride = tod
             let renderer = ImageRenderer(content: PanelRoot().environmentObject(model))
@@ -104,13 +116,13 @@ enum Snapshots {
         model.history = [94, 90, 84, 66, 48, 58, 76, 88, 72, 52, 64, 82, 91, 86]
         model.focus = 82
         model.calibrating = false
-        model.now = t0.addingTimeInterval(7 * 60)
+        model.timeShift = 7 * 60
         shot("3-study-sunset", .sunset)
         model.showSettings = true
         shot("4-settings-night", .night)
         model.showSettings = false
         model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1))
-        model.now = t0.addingTimeInterval(27 * 60)
+        model.timeShift = 27 * 60
         shot("5-break-day", .day)
         model.clock.tick(at: t0.addingTimeInterval(24 * 3600))
         model.nudges = 2

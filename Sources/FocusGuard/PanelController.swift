@@ -23,8 +23,9 @@ final class FloatingPanel: NSPanel {
 /// ⌃⌥⌘F anywhere toggles the panel. Carbon hot keys need no Accessibility permission.
 @MainActor private var hotKeyAction: (() -> Void)?
 
+/// Returns false when the shortcut could not be had (another app registered it first).
 @MainActor
-private func registerHotKey(_ action: @escaping () -> Void) {
+private func registerHotKey(_ action: @escaping () -> Void) -> Bool {
     hotKeyAction = action
     var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
     let installed = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
@@ -35,6 +36,7 @@ private func registerHotKey(_ action: @escaping () -> Void) {
     let registered = RegisterEventHotKey(UInt32(kVK_ANSI_F), UInt32(controlKey | optionKey | cmdKey),
                                          EventHotKeyID(signature: OSType(0x46474B59), id: 1), GetApplicationEventTarget(), 0, &ref)
     if installed != noErr || registered != noErr { NSLog("FocusGuard: hot key not available (install \(installed), register \(registered))") }
+    return installed == noErr && registered == noErr
 }
 
 /// Our own status item and the panel anchored under it. Replaces MenuBarExtra, which cannot be made
@@ -52,7 +54,7 @@ final class PanelController: NSObject {
     init(model: AppModel, quiet: Bool = false) {
         self.model = model
         self.quiet = quiet
-        panel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: CW + 2 * PAD, height: CH + 2 * PAD),
+        panel = FloatingPanel(contentRect: NSRect(origin: .zero, size: panelSize),
                               styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init()
         panel.isReleasedWhenClosed = false
@@ -83,7 +85,16 @@ final class PanelController: NSObject {
             DispatchQueue.main.async { self?.updateStatusItem() }
         }.store(in: &bag)
         Bubble.anchorFrame = { [weak self] in self?.item.button?.window?.frame }
-        if !quiet { registerHotKey { [weak self] in self?.toggle() } }
+        if !quiet { model.hotKeyTaken = !registerHotKey { [weak self] in self?.toggle() } }
+        // "bigger panel": resize the window around the scaled scene, keeping it under the icon.
+        model.$largePanel.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let s = self.model.panelScale
+                self.panel.setContentSize(NSSize(width: panelSize.width * s, height: panelSize.height * s))
+                if self.isOpen { self.position() }
+            }
+        }.store(in: &bag)
     }
 
     var windowNumber: Int { panel.windowNumber }
@@ -144,6 +155,7 @@ final class PanelController: NSObject {
             panel.orderBack(nil)
         } else {
             panel.makeKeyAndOrderFront(nil)
+            if let clickMonitor { NSEvent.removeMonitor(clickMonitor) } // show() twice must not leak a monitor
             clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
                 Task { @MainActor in self?.hide() }
             }
@@ -168,9 +180,10 @@ final class PanelController: NSObject {
         panel.setFrameOrigin(CGPoint(x: x, y: max(itemFrame.minY - size.height, visible.minY)))
     }
 
-    /// Esc steps back one layer (note, confirm, camera card, setup) before it closes the panel.
+    /// Esc steps back one layer (a note, confirm, camera card, setup) before it closes the panel.
     private func escape() {
         if model.showSettings { model.showSettings = false }
+        else if model.showMusic { model.showMusic = false }
         else if model.confirmStop { model.confirmStop = false }
         else if model.showCameraWhy { model.showCameraWhy = false }
         else if model.showSetup { model.showSetup = false }
@@ -184,6 +197,7 @@ final class PanelController: NSObject {
         if flags == .command {
             switch event.charactersIgnoringModifiers {
             case "q": NSApp.terminate(nil); return true
+            case "w": hide(); return true
             case ",": model.toggleSettings(); return true
             default: return false
             }
@@ -194,6 +208,7 @@ final class PanelController: NSObject {
         case 49: // space
             if model.usingKeyboard && model.controlFocused { return false } // the focused control gets it
             if event.isARepeat { return true } // holding space must not flip pause on and off
+            if model.showMusic { model.spotify.send(.playPause); return true } // the record sleeve: space plays or pauses Spotify
             // Only the plain card answers space: a question or the note on top must not start or pause anything.
             if model.showSettings || model.cardKey == "confirm" || model.cardKey == "why" { return true }
             model.spaceTapped(); return true

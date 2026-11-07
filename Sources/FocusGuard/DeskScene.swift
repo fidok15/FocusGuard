@@ -131,10 +131,18 @@ enum TimeOfDay: CaseIterable {
 
 // MARK: - Scene
 
+/// Panel size in points at normal scale: the visible scene plus the shadow margin.
+let panelSize = CGSize(width: CW + 2 * PAD, height: CH + 2 * PAD)
+
 /// What the panel and the debug window show: the scene with a transparent margin for the shadow.
 struct PanelRoot: View {
+    @EnvironmentObject var model: AppModel
+
     var body: some View {
+        let s = model.panelScale
         DeskScene().offset(x: -OX, y: -OY).frame(width: CW, height: CH, alignment: .topLeading).padding(PAD)
+            .scaleEffect(s, anchor: .topLeading)
+            .frame(width: panelSize.width * s, height: panelSize.height * s, alignment: .topLeading)
     }
 }
 
@@ -166,9 +174,9 @@ struct DeskScene: View {
             Hotspot(name: "sticky", groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, help: "Settings") {
                 model.toggleSettings()
             }
-            Hotspot(name: "record", groups: [tod.props.record], help: "Music") { model.musicOn.toggle() }
+            Hotspot(name: "record", groups: [tod.props.record], help: "Spotify: now playing", action: model.toggleMusic)
 
-            if !model.showSettings { SessionCard() } // the note takes the card's place
+            if !model.showSettings && !model.showMusic { SessionCard() } // a note takes the card's place
 
             if model.showPreview && model.camera == .running {
                 Polaroid(session: model.cameraService.session).place(Spots.polaroid)
@@ -178,17 +186,25 @@ struct DeskScene: View {
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
                 SettingsNote()
-                    .position(x: 128, y: 136)
+                    .position(x: 128, y: 146) // room above for the extra red lines (login, hot key)
                     .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
 
-            QuitButton().position(x: 622, y: 52) // on the top-right corner of the room, above the note's tap catcher
+            if model.showMusic {
+                Color.black.opacity(0.001).onTapGesture { model.showMusic = false }
+                MusicNote()
+                    .position(x: 150, y: 150)
+                    .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
+            }
+
+            CloseButton().position(x: 622, y: 52) // on the top-right corner of the room, above the notes' tap catchers
         }
         .frame(width: W, height: H)
         .fixedSize()
         .coordinateSpace(name: "scene")
         .animation(.easeInOut(duration: 1.2), value: tod)
         .animation(.spring(duration: 0.3), value: model.showSettings)
+        .animation(.spring(duration: 0.3), value: model.showMusic)
         .animation(.spring(duration: 0.3), value: model.showPreview && model.camera == .running)
         .animation(.easeOut(duration: 0.25), value: model.cardKey)
     }
@@ -553,13 +569,13 @@ private struct LCDLayout {
     }
 }
 
-/// While music is on, the record sheen turns and a few notes drift up from the player. The tonearm stays put.
+/// While Spotify plays, the record sheen turns and a few notes drift up from the player. The tonearm stays put.
 private struct RecordSpin: View {
     @EnvironmentObject var model: AppModel
     let image: NSImage?
     let props: Props
 
-    private var spinning: Bool { model.musicOn && !calmMotion }
+    private var spinning: Bool { model.spotify.playing && !calmMotion }
 
     var body: some View {
         if spinning, let image {

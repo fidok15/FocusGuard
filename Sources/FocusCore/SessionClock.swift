@@ -1,5 +1,12 @@
 import Foundation
 
+/// Time that only moves forward and keeps counting while the Mac sleeps. Setting the Mac's clock does not move it,
+/// so session deadlines and focus timers use this; only what is shown as wall time (the desk clock, the sky) uses Date().
+public enum Mono {
+    public static func seconds() -> Double { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1e9 }
+    public static func now() -> Date { Date(timeIntervalSinceReferenceDate: seconds()) }
+}
+
 public struct SessionConfig: Equatable, Sendable {
     public var studyMinutes: Int
     public var breakMinutes: Int

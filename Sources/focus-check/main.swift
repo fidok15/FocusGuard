@@ -249,7 +249,24 @@ func lowConfidenceStretchResetsHold() {
     check((first ?? 0) >= 139)
 }
 
+func spotifyReplyParses() {
+    let d = String(NowPlaying.separator)
+    let n = NowPlaying.parse(["playing", "Blue", "Joni Mitchell", "Blue", "https://i.scdn.co/image/ab67", "true", "false"].joined(separator: d))
+    check(n == NowPlaying(playing: true, title: "Blue", artist: "Joni Mitchell", album: "Blue",
+                          artworkURL: URL(string: "https://i.scdn.co/image/ab67"), shuffling: true, repeating: false))
+    check(NowPlaying.parse("stopped") == nil) // nothing loaded
+    check(NowPlaying.parse(["paused", "A", "B", "C", "file:///etc/passwd", "false", "true"].joined(separator: d))?.artworkURL == nil)
+    check(NowPlaying.parse(["paused", "A", "B", "C", "https://evil.example/x.jpg", "false", "true"].joined(separator: d))?.artworkURL == nil)
+}
+
+func monoNeverGoesBack() {
+    let a = Mono.seconds(), b = Mono.seconds()
+    check(b >= a && a > 0)
+}
+
 let checks: [(String, () -> Void)] = [
+    ("spotifyReplyParses", spotifyReplyParses),
+    ("monoNeverGoesBack", monoNeverGoesBack),
     ("lowConfidenceStretchResetsHold", lowConfidenceStretchResetsHold),
     ("noInstantAlertAfterFrameGap", noInstantAlertAfterFrameGap),
     ("delayedCalibrationStillWorks", delayedCalibrationStillWorks),

@@ -82,7 +82,7 @@ final class CameraService: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        let now = Date().timeIntervalSinceReferenceDate
+        let now = Mono.seconds() // a change of the Mac's clock must not stall the throttle or the scorer's timers
         guard now - lastFrame >= 0.1, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         lastFrame = now
         if let signals = FaceAnalyzer.analyze(pixels) { onSignals?(signals, now) }

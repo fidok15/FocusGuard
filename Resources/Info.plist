@@ -15,6 +15,7 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSAppleEventsUsageDescription</key><string>FocusGuard shows what Spotify is playing on the record player and lets you play, pause, skip, shuffle, and repeat from there.</string>
     <key>NSCameraUsageDescription</key><string>FocusGuard uses the camera only while you study, to estimate your focus. Frames are analyzed on this Mac and never saved or sent anywhere.</string>
 </dict>
 </plist>

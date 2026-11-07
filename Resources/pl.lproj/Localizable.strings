@@ -36,7 +36,6 @@
 "The cat believes in you. Focus up! ♡" = "Kot w Ciebie wierzy. Skup się! ♡";
 "Deep breath, one more page~" = "Głęboki oddech, jeszcze jedna strona~";
 "Start or stop a study session" = "Rozpocznij lub zakończ sesję nauki";
-"Music" = "Muzyka";
 "paused" = "pauza";
 "paused, space to resume" = "pauza, spacja wznawia";
 "click the clock to" = "kliknij zegar,";
@@ -75,3 +74,17 @@
 "focus history" = "historia skupienia";
 "on" = "włączone";
 "off" = "wyłączone";
+"bigger panel" = "większy panel";
+"⌃⌥⌘F is used by another app" = "⌃⌥⌘F zajęła inna aplikacja";
+"Close" = "Zamknij";
+"Spotify: now playing" = "Spotify: teraz gra";
+"now playing" = "teraz gra";
+"nothing playing" = "nic nie gra";
+"Spotify isn't open" = "Spotify nie jest włączone";
+"open Spotify" = "otwórz Spotify";
+"allow FocusGuard to control Spotify in System Settings" = "pozwól FocusGuard sterować Spotify w Ustawieniach systemowych";
+"shuffle" = "losowo";
+"previous" = "poprzedni";
+"play" = "graj";
+"next" = "następny";
+"repeat" = "powtarzaj";

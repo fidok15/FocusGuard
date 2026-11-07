@@ -2,12 +2,13 @@ import AppKit
 import ServiceManagement
 import SwiftUI
 
-/// Always-visible way out: menu bar apps have no Dock icon or app menu. Washi tape across the corner with a pencil ×. Also bound to ⌘Q.
-struct QuitButton: View {
+/// Washi tape across the corner with a pencil ×: hides the panel (⌘W too). Quitting lives in the menu bar icon's right-click menu and ⌘Q.
+struct CloseButton: View {
+    @EnvironmentObject var model: AppModel
     @StateObject private var hover = Box(false)
 
     var body: some View {
-        Button { NSApp.terminate(nil) } label: {
+        Button { model.closePanel() } label: {
             ZStack {
                 WashiTape(width: 64, height: 20)
                 Path { p in // a 10 × 10 box, centred on the tape
@@ -25,10 +26,9 @@ struct QuitButton: View {
             .shadow(color: .black.opacity(hover.value ? 0.35 : 0.2), radius: hover.value ? 3 : 1.5, y: 1)
         }
         .buttonStyle(PressStyle())
-        .keyboardShortcut("q")
         .onHover { hover.value = $0 }
-        .help("Quit FocusGuard")
-        .accessibilityLabel(Text("Quit FocusGuard"))
+        .help("Close")
+        .accessibilityLabel(Text("Close"))
         .animation(.easeOut(duration: 0.15), value: hover.value)
     }
 }
@@ -115,6 +115,7 @@ struct SettingsNote: View {
                     BoxChoice(title: "camera preview", checked: model.showPreview, size: 12) { model.showPreview.toggle() }
                 }
                 BoxChoice(title: "sounds", checked: model.soundsOn, size: 12) { model.soundsOn.toggle() }
+                BoxChoice(title: "bigger panel", checked: model.largePanel, size: 12) { model.largePanel.toggle() }
                 BoxChoice(title: "launch at login", checked: model.launchAtLogin, size: 12) { model.launchAtLogin.toggle() }
                 if model.loginApproval {
                     Button(action: SMAppService.openSystemSettingsLoginItems) {
@@ -123,6 +124,9 @@ struct SettingsNote: View {
                     }.buttonStyle(.plain)
                 } else if let note = model.loginNote {
                     Text(note).font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
+                }
+                if model.hotKeyTaken {
+                    Text("⌃⌥⌘F is used by another app").font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.top, 4)
@@ -142,5 +146,123 @@ struct SettingsNote: View {
         }
         .overlay(alignment: .top) { WashiTape(width: 58, height: 14).rotationEffect(.degrees(-4)).offset(y: -7) }
         .rotationEffect(.degrees(-2))
+    }
+}
+
+/// A kraft-paper record sleeve over the player: what Spotify plays, its cover, and pencil-drawn controls.
+struct MusicNote: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        let spotify = model.spotify
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 10) {
+                Cover(image: spotify.artwork)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(spotify.playing ? "now playing" : "Spotify").font(Ink.hand(11)).opacity(0.7)
+                    if let track = spotify.track {
+                        Text(verbatim: track.title).font(Ink.hand(14)).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        Text(verbatim: track.artist).font(Ink.hand(12)).opacity(0.8).lineLimit(1)
+                    } else if spotify.running {
+                        Text("nothing playing").font(Ink.hand(13))
+                    } else {
+                        Text("Spotify isn't open").font(Ink.hand(13))
+                        WordLink(title: "open Spotify", size: 12, underlined: true, action: spotify.openSpotify).padding(.top, 2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if spotify.running {
+                HStack(spacing: 0) {
+                    PlayerKey(symbol: "shuffle", label: "shuffle", on: spotify.track?.shuffling) { spotify.send(.shuffle) }
+                    Spacer(minLength: 0)
+                    PlayerKey(symbol: "backward.fill", label: "previous") { spotify.send(.previous) }
+                    Spacer(minLength: 0)
+                    PlayerKey(symbol: spotify.playing ? "pause.fill" : "play.fill", label: spotify.playing ? "pause" : "play", big: true) {
+                        spotify.send(.playPause)
+                    }
+                    Spacer(minLength: 0)
+                    PlayerKey(symbol: "forward.fill", label: "next") { spotify.send(.next) }
+                    Spacer(minLength: 0)
+                    PlayerKey(symbol: "repeat", label: "repeat", on: spotify.track?.repeating) { spotify.send(.repeat) }
+                }
+                .padding(.horizontal, 2)
+            }
+            if spotify.access == .denied {
+                Button(action: spotify.openAutomationSettings) {
+                    Text("allow FocusGuard to control Spotify in System Settings").font(Ink.hand(11)).foregroundStyle(Ink.red)
+                        .underline().fixedSize(horizontal: false, vertical: true)
+                }.buttonStyle(.plain)
+            }
+        }
+        .foregroundStyle(Ink.pencil)
+        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 12)
+        .frame(width: 222, alignment: .leading)
+        .background {
+            CurledNote()
+                .fill(LinearGradient(colors: [Color(red: 0.94, green: 0.88, blue: 0.77), Color(red: 0.89, green: 0.81, blue: 0.68)],
+                                     startPoint: .top, endPoint: .bottom))
+                .shadow(color: .black.opacity(0.3), radius: 5, x: 1, y: 3)
+        }
+        .overlay(alignment: .top) { WashiTape(width: 52, height: 13).rotationEffect(.degrees(3)).offset(x: 40, y: -6) }
+        .rotationEffect(.degrees(1.5))
+    }
+
+    /// The album cover as a small print with a white border; a pencil record when there is none.
+    private struct Cover: View {
+        let image: NSImage?
+
+        var body: some View {
+            Group {
+                if let image {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    ZStack {
+                        Circle().stroke(Ink.pencil.opacity(0.7), lineWidth: 1.2)
+                        Circle().stroke(Ink.pencil.opacity(0.35), lineWidth: 0.8).padding(9)
+                        Circle().fill(Ink.red.opacity(0.7)).frame(width: 14, height: 14)
+                    }
+                    .padding(6)
+                }
+            }
+            .frame(width: 60, height: 60)
+            .clipped()
+            .padding(3)
+            .background(Color.white.shadow(.drop(color: .black.opacity(0.3), radius: 2, y: 1)))
+            .rotationEffect(.degrees(-3))
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// One player control drawn in pencil; shuffle and repeat show whether they are on.
+    private struct PlayerKey: View {
+        let symbol: String
+        let label: LocalizedStringKey
+        var on: Bool? = nil
+        var big = false
+        let action: () -> Void
+        @StateObject private var hover = Box(false)
+
+        var body: some View {
+            Button(action: action) {
+                Image(systemName: symbol)
+                    .font(.system(size: big ? 17 : 12, weight: .bold))
+                    .foregroundStyle(Ink.pencil.opacity(on == false ? 0.4 : 1))
+                    .frame(width: big ? 34 : 24, height: big ? 30 : 24)
+                    .overlay { if big { LooseEllipse(seed: 4).stroke(Ink.pencil.opacity(0.75), lineWidth: 1) } }
+                    .overlay(alignment: .bottom) {
+                        if on == true { Circle().fill(Ink.pencil).frame(width: 3, height: 3).offset(y: 1) }
+                    }
+                    .scaleEffect(hover.value ? 1.12 : 1)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .pencilFocus(action)
+            .onHover { hover.value = $0 }
+            .animation(.easeOut(duration: 0.15), value: hover.value)
+            .help(label)
+            .accessibilityLabel(Text(label))
+            .accessibilityValue(on.map { $0 ? Text("on") : Text("off") } ?? Text(verbatim: ""))
+        }
     }
 }

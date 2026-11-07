@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import Combine
 import FocusCore
 import ServiceManagement
 import SwiftUI
@@ -19,7 +20,12 @@ final class AppModel: ObservableObject {
     /// Frames still arrive but none could be scored for a while (face turned away, poor light): no figure beats a stale one.
     @Published var focusStale = false
     @Published var showSetup = false
-    @Published var showSettings = false
+    /// The settings and Spotify notes share one spot: opening one, from anywhere, puts the other away.
+    @Published var showSettings = false { didSet { if showSettings { showMusic = false } } }
+    /// The Spotify note over the record player.
+    @Published var showMusic = false { didSet { if showMusic { showSettings = false } } }
+    /// ⌃⌥⌘F could not be registered (another app owns it); the settings note says so.
+    @Published var hotKeyTaken = false
     @Published var confirmStop = false
     /// Explains the camera on the card before the system prompt shows (first session only).
     @Published var showCameraWhy = false
@@ -54,7 +60,8 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var soundsOn: Bool { didSet { save() } }
-    @Published var musicOn: Bool { didSet { save() } }
+    /// Draws the whole panel 25 % larger, for reading the hand-written text more easily.
+    @Published var largePanel: Bool { didSet { save() } }
     @Published var launchAtLogin: Bool {
         didSet {
             guard !syncingLogin, launchAtLogin != oldValue else { return }
@@ -75,9 +82,12 @@ final class AppModel: ObservableObject {
     var cameraExplained: Bool { didSet { save() } }
 
     let cameraService = CameraService()
+    let spotify = Spotify()
+    private var bag = Set<AnyCancellable>()
     /// Set by the panel controller: closes the panel (Esc).
     var closePanel: () -> Void = {}
     private var scorer: FocusScorer?
+    // Monotonic times (Mono.now()), so a change of the Mac's clock cannot fake a stall or a stale score.
     private var lastSample = Date.distantPast
     private var lastCameraRetry = Date.distantPast
     /// Last time the camera delivered a frame, and last time one of them counted for the score.
@@ -99,11 +109,12 @@ final class AppModel: ObservableObject {
         showPreview = d.object(forKey: "showPreview") as? Bool ?? false
         useCamera = d.object(forKey: "useCamera") as? Bool ?? true
         soundsOn = d.object(forKey: "soundsOn") as? Bool ?? true
-        musicOn = d.object(forKey: "musicOn") as? Bool ?? false
+        largePanel = d.object(forKey: "largePanel") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
         launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
 
+        spotify.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         cameraService.onSignals = { [weak self] signals, t in
             Task { @MainActor in self?.handle(signals, at: t) }
         }
@@ -126,6 +137,7 @@ final class AppModel: ObservableObject {
     // MARK: Derived state
 
     var timeOfDay: TimeOfDay { timeOverride ?? TimeOfDay(date: now) }
+    var panelScale: CGFloat { largePanel ? 1.25 : 1 }
     var timeOverride: TimeOfDay?
     /// Which card is showing above the clock; changing it plays the card's enter motion.
     var cardKey: String {
@@ -140,7 +152,10 @@ final class AppModel: ObservableObject {
             return seenHint ? "idle" : "hint"
         }
     }
-    var remaining: TimeInterval { clock.remaining(at: now) }
+    var remaining: TimeInterval { clock.remaining(at: monoNow) }
+    /// Debug fixtures move the session clock forward with this; always 0 in normal use.
+    var timeShift: TimeInterval = 0
+    private var monoNow: Date { Mono.now().addingTimeInterval(timeShift) }
     var remainingText: String {
         let s = Int(remaining.rounded(.up))
         return String(format: "%d:%02d", s / 60, s % 60)
@@ -164,6 +179,7 @@ final class AppModel: ObservableObject {
     /// Click on the clock or space while idle: start with the last-used settings, after the one-time camera explanation.
     func requestStart() {
         showSettings = false
+        showMusic = false // the camera card must be seen, and the notes hide the card
         showSetup = false
         if useCamera && !cameraExplained && AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
             showCameraWhy = true
@@ -193,7 +209,7 @@ final class AppModel: ObservableObject {
         pausedBySleep = false
         seenHint = true
         phaseStart = Date()
-        clock.start(config, at: Date())
+        clock.start(config, at: monoNow)
         // Keeps App Nap from throttling the timer without blocking idle sleep.
         activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
                                                          reason: "Study session timer")
@@ -211,7 +227,7 @@ final class AppModel: ObservableObject {
         tick() // a phase that ended since the last tick gets its announcement before the pause freezes the clock
         guard clock.phase.isRunning else { return }
         pausedBySleep = false
-        if clock.isPaused { clock.resume(at: Date()) } else { clock.pause(at: Date()) }
+        if clock.isPaused { clock.resume(at: monoNow) } else { clock.pause(at: monoNow) }
         phaseChanged()
     }
 
@@ -223,6 +239,7 @@ final class AppModel: ObservableObject {
 
     func clockTapped() {
         showSettings = false
+        showMusic = false
         showCameraWhy = false
         if clock.phase.isRunning { confirmStop.toggle() } else { requestStart() }
     }
@@ -235,8 +252,18 @@ final class AppModel: ObservableObject {
 
     func toggleSettings() {
         showSettings.toggle()
+        showMusic = false
         showSetup = false
         confirmStop = false
+    }
+
+    /// Click on the record player: what Spotify plays, with its controls. Asking now is what lets macOS show
+    /// its "control Spotify" prompt at a moment the user expects it.
+    func toggleMusic() {
+        showMusic.toggle()
+        showSettings = false
+        confirmStop = false
+        if showMusic { spotify.refresh(ask: true) }
     }
 
     func panelOpened() {
@@ -244,6 +271,7 @@ final class AppModel: ObservableObject {
         now = Date()
         usingKeyboard = false
         syncLogin()
+        spotify.refresh(ask: false)
     }
 
     /// Launch at login can change behind our back (System Settings), so read it again whenever the panel opens.
@@ -257,6 +285,7 @@ final class AppModel: ObservableObject {
     func panelClosed() {
         panelOpen = false
         showSettings = false
+        showMusic = false
         showCameraWhy = false
         confirmStop = false
     }
@@ -269,12 +298,12 @@ final class AppModel: ObservableObject {
 
     private func tick() {
         let before = clock.phase
-        let date = Date()
-        if panelOpen || clock.phase.isRunning { now = date } // nothing on screen changes otherwise
+        let wall = Date(), date = monoNow
+        if panelOpen || clock.phase.isRunning { now = wall } // nothing on screen changes otherwise
         if clock.tick(at: date) {
-            now = date
+            now = wall
             phaseChanged()
-            phaseStart = date
+            phaseStart = wall
             if !clock.phase.isRunning { confirmStop = false } // the question is moot once the session finished
             if let announcement = before.announcement(to: clock.phase) { announce(announcement) }
         }
@@ -289,14 +318,14 @@ final class AppModel: ObservableObject {
             }
             focusStale = !calibrating && date.timeIntervalSince(lastScored) > 4
         }
-        if showsFocus, now.timeIntervalSince(lastSample) >= 5 {
+        if showsFocus, date.timeIntervalSince(lastSample) >= 5 {
             history.append(focus)
-            lastSample = now
+            lastSample = date
         }
         // Camera unplugged or busy: retry every 5 s. Access granted in System Settings after a denial: start right away.
         let granted = camera == .denied && AVCaptureDevice.authorizationStatus(for: .video) == .authorized
-        if granted || camera == .unavailable, !timerOnly, now.timeIntervalSince(lastCameraRetry) >= 5 {
-            lastCameraRetry = now
+        if granted || camera == .unavailable, !timerOnly, date.timeIntervalSince(lastCameraRetry) >= 5 {
+            lastCameraRetry = date
             startCamera()
         }
     }
@@ -327,7 +356,7 @@ final class AppModel: ObservableObject {
         alerting = false
         focusStale = false
         if clock.phase.isStudy && !clock.isPaused && !timerOnly {
-            scorer = FocusScorer(params: .forSensitivity(sensitivity), start: now.timeIntervalSinceReferenceDate)
+            scorer = FocusScorer(params: .forSensitivity(sensitivity), start: Mono.seconds()) // camera frames carry Mono time too
             focus = 100
             calibrating = true
             startCamera()
@@ -354,14 +383,14 @@ final class AppModel: ObservableObject {
             if self.scorer == nil { self.cameraService.stop(); self.camera = .off; return }
             self.camera = status
             // The watchdog counts from here; the score stays stale until a frame actually counts.
-            if status == .running { self.lastSignal = Date() }
+            if status == .running { self.lastSignal = Mono.now() }
         }
     }
 
     private func handle(_ signals: FaceSignals, at t: Double) {
         guard let scorer else { return }
         let event = scorer.process(signals, at: t)
-        lastSignal = Date()
+        lastSignal = Mono.now()
         if scorer.lastFrame == t { lastScored = lastSignal }
         focus = scorer.smoothedScore
         calibrating = scorer.isCalibrating
@@ -389,7 +418,7 @@ final class AppModel: ObservableObject {
         d.set(showPreview, forKey: "showPreview")
         d.set(useCamera, forKey: "useCamera")
         d.set(soundsOn, forKey: "soundsOn")
-        d.set(musicOn, forKey: "musicOn")
+        d.set(largePanel, forKey: "largePanel")
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")
     }
