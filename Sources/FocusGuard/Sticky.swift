@@ -5,18 +5,31 @@ import SwiftUI
 /// Washi tape across the corner with a pencil ×: hides the panel (⌘W too). Quitting lives in the menu bar icon's right-click menu and ⌘Q.
 struct CloseButton: View {
     @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        TapeX(width: 64, height: 20, help: "Close", action: model.closePanel)
+    }
+}
+
+/// A strip of washi tape stuck across a corner, with a pencil × on it.
+struct TapeX: View {
+    let width: CGFloat
+    let height: CGFloat
+    let help: LocalizedStringKey
+    let action: () -> Void
     @StateObject private var hover = Box(false)
 
     var body: some View {
-        Button { model.closePanel() } label: {
+        let x = height / 2 // the × scales with the tape
+        Button(action: action) {
             ZStack {
-                WashiTape(width: 64, height: 20)
-                Path { p in // a 10 × 10 box, centred on the tape
-                    p.move(to: CGPoint(x: 0.5, y: 1)); p.addLine(to: CGPoint(x: 9.2, y: 9.6))
-                    p.move(to: CGPoint(x: 9.6, y: 0.8)); p.addLine(to: CGPoint(x: 0.7, y: 9.4))
+                WashiTape(width: width, height: height)
+                Path { p in
+                    p.move(to: CGPoint(x: 0.05 * x, y: 0.1 * x)); p.addLine(to: CGPoint(x: 0.92 * x, y: 0.96 * x))
+                    p.move(to: CGPoint(x: 0.96 * x, y: 0.08 * x)); p.addLine(to: CGPoint(x: 0.07 * x, y: 0.94 * x))
                 }
                 .stroke(Ink.pencil, style: StrokeStyle(lineWidth: hover.value ? 2.2 : 1.8, lineCap: .round))
-                .frame(width: 10, height: 10)
+                .frame(width: x, height: x)
                 .rotationEffect(.degrees(-45))
             }
             .contentShape(Rectangle())
@@ -27,8 +40,8 @@ struct CloseButton: View {
         }
         .buttonStyle(PressStyle())
         .onHover { hover.value = $0 }
-        .help("Close")
-        .accessibilityLabel(Text("Close"))
+        .help(help)
+        .accessibilityLabel(Text(help))
         .animation(.easeOut(duration: 0.15), value: hover.value)
     }
 }
