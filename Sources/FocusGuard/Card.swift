@@ -36,6 +36,9 @@ struct SessionCard: View {
                 .overlay(alignment: .topLeading) {
                     WashiTape(width: 34, height: 11).rotationEffect(.degrees(-5)).offset(x: size.width - 48, y: -2)
                 }
+                .overlay(alignment: .topLeading) {
+                    if key == "study" || key == "rest" { HideCardButton().offset(x: -7, y: -7) }
+                }
                 .padding(.bottom, Self.tail)
                 .frame(width: size.width, height: size.height + Self.tail, alignment: .top)
                 .rotationEffect(.degrees(-1.5), anchor: .bottom) // the tail keeps pointing at the clock
@@ -44,6 +47,33 @@ struct SessionCard: View {
         }
         .frame(width: W, height: H, alignment: .topLeading)
         .offset(x: Spots.clockTop.x - size.width / 2 - 12, y: Spots.clockTop.y - Self.tail - size.height)
+    }
+}
+
+/// A pencil × on the card's corner: puts the card away so only the room shows. The session keeps running.
+private struct HideCardButton: View {
+    @EnvironmentObject var model: AppModel
+    @StateObject private var hover = Box(false)
+
+    var body: some View {
+        Button { model.cardHidden = true } label: {
+            Path { p in
+                p.move(to: CGPoint(x: 0.5, y: 1)); p.addLine(to: CGPoint(x: 8.2, y: 8.6))
+                p.move(to: CGPoint(x: 8.6, y: 0.8)); p.addLine(to: CGPoint(x: 0.7, y: 8.4))
+            }
+            .stroke(Ink.pencil.opacity(hover.value ? 1 : 0.7), style: StrokeStyle(lineWidth: hover.value ? 1.9 : 1.5, lineCap: .round))
+            .frame(width: 9, height: 9)
+            .padding(5)
+            .background(Circle().fill(Ink.page).shadow(color: .black.opacity(0.3), radius: 1.2, y: 1))
+            .scaleEffect(hover.value ? 1.12 : 1)
+            .contentShape(Circle())
+        }
+        .buttonStyle(PressStyle())
+        .pencilFocus { model.cardHidden = true }
+        .onHover { hover.value = $0 }
+        .animation(.easeOut(duration: 0.15), value: hover.value)
+        .help("Hide the card (click the clock to bring it back)")
+        .accessibilityLabel(Text("Hide the card"))
     }
 }
 

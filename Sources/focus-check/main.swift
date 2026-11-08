@@ -255,6 +255,9 @@ func spotifyReplyParses() {
     check(n == NowPlaying(playing: true, title: "Blue", artist: "Joni Mitchell", album: "Blue",
                           artworkURL: URL(string: "https://i.scdn.co/image/ab67"), shuffling: true, repeating: false))
     check(NowPlaying.parse("stopped") == nil) // nothing loaded
+    check(NowPlaying.oembedThumbnail(Data(#"{"thumbnail_url":"https://image-cdn-ak.spotifycdn.com/image/ab67"}"#.utf8))
+          == URL(string: "https://image-cdn-ak.spotifycdn.com/image/ab67"))
+    check(NowPlaying.oembedThumbnail(Data(#"{"thumbnail_url":"https://evil.example/x.jpg"}"#.utf8)) == nil)
     check(NowPlaying.parse(["paused", "A", "B", "C", "file:///etc/passwd", "false", "true"].joined(separator: d))?.artworkURL == nil)
     check(NowPlaying.parse(["paused", "A", "B", "C", "https://evil.example/x.jpg", "false", "true"].joined(separator: d))?.artworkURL == nil)
 }

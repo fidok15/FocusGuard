@@ -27,6 +27,8 @@ final class AppModel: ObservableObject {
     /// ⌃⌥⌘F could not be registered (another app owns it); the settings note says so.
     @Published var hotKeyTaken = false
     @Published var confirmStop = false
+    /// The × on the running session's card put it away for a clean room; a click on the clock brings it back.
+    @Published var cardHidden = false
     /// Explains the camera on the card before the system prompt shows (first session only).
     @Published var showCameraWhy = false
     /// Why the running clock is paused, so the card can say it.
@@ -208,6 +210,7 @@ final class AppModel: ObservableObject {
         showCameraWhy = false
         pausedBySleep = false
         seenHint = true
+        cardHidden = false
         phaseStart = Date()
         clock.start(config, at: monoNow)
         // Keeps App Nap from throttling the timer without blocking idle sleep.
@@ -241,6 +244,7 @@ final class AppModel: ObservableObject {
         showSettings = false
         showMusic = false
         showCameraWhy = false
+        if cardHidden && clock.phase.isRunning { cardHidden = false; return } // first click only brings the card back
         if clock.phase.isRunning { confirmStop.toggle() } else { requestStart() }
     }
 

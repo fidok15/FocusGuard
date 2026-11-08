@@ -5,6 +5,9 @@ import FocusCore
 /// Track changes arrive as Spotify's own distributed notification, which needs no permission. The cover, shuffle and
 /// repeat, and every control go through AppleScript, which macOS asks the user to allow once ("control Spotify").
 /// FocusGuard never launches Spotify: nothing is sent unless Spotify is already running.
+/// Spotify 1.3 answers every AppleScript read with "stopped", no track and shuffle / repeat off, while its setters
+/// still work. So the notification is the source of truth, a read only counts when it finds a track, and shuffle /
+/// repeat are set to an explicit value from what we last set rather than flipped by Spotify's wrong reading.
 @MainActor
 final class Spotify: ObservableObject {
     enum Access { case unknown, granted, denied }
@@ -20,6 +23,8 @@ final class Spotify: ObservableObject {
 
     private let queue = DispatchQueue(label: "FocusGuard.spotify")
     private var artworkURL: URL?
+    /// "spotify:track:…" from the notification; the oEmbed lookup turns it into a cover link.
+    private var trackID: String?
     /// Bumped when a notification or Spotify quitting replaces the track, so a read started earlier cannot bring the old one back.
     private var generation = 0
 
@@ -42,7 +47,7 @@ final class Spotify: ObservableObject {
                 let launched = name == NSWorkspace.didLaunchApplicationNotification
                 MainActor.assumeIsolated {
                     self?.running = launched
-                    if !launched { self?.generation += 1; self?.track = nil; self?.dropArtwork() }
+                    if !launched { self?.generation += 1; self?.track = nil; self?.trackID = nil; self?.dropArtwork() }
                 }
             }
         }
@@ -58,6 +63,7 @@ final class Spotify: ObservableObject {
         let state = info["Player State"] as? String
         if state == "Stopped" {
             track = nil
+            trackID = nil
             dropArtwork()
         } else if let title = info["Name"] as? String, !title.isEmpty {
             var t = NowPlaying(playing: state == "Playing", title: title, artist: info["Artist"] as? String ?? "",
@@ -69,7 +75,9 @@ final class Spotify: ObservableObject {
                 if sameTrack { t.artworkURL = old.artworkURL }
             }
             if !sameTrack { dropArtwork() } // never show the last album's cover next to a new song
+            trackID = info["Track ID"] as? String
             track = t
+            loadArtwork()
         }
         refresh(ask: false)
     }
@@ -88,23 +96,35 @@ final class Spotify: ObservableObject {
                     // Spotify may have quit, or moved on to another track, while this was read.
                     guard allowed == noErr, self.running, started == self.generation else { return }
                     self.access = .granted
-                    if let reply { self.track = NowPlaying.parse(reply) }
-                    self.loadArtwork()
+                    // A read without a track is what Spotify 1.3 always answers: keep what the notification said.
+                    if let reply, let read = NowPlaying.parse(reply) {
+                        self.track = read
+                        self.loadArtwork()
+                    }
                 }
             }
         }
     }
 
-    enum Command: String {
-        case playPause = "playpause"
-        case next = "next track"
-        case previous = "previous track"
-        case shuffle = "set shuffling to not shuffling"
-        case `repeat` = "set repeating to not repeating"
-    }
+    enum Command { case playPause, next, previous, shuffle, `repeat` }
 
     func send(_ command: Command) {
         guard running else { return }
+        // The note answers at once; Spotify's notification confirms play / pause a moment later.
+        let script: String
+        switch command {
+        case .playPause: script = "playpause"; track?.playing.toggle()
+        case .next: script = "next track"
+        case .previous: script = "previous track"
+        case .shuffle:
+            let on = !(track?.shuffling ?? false)
+            track?.shuffling = on
+            script = "set shuffling to \(on)"
+        case .repeat:
+            let on = !(track?.repeating ?? false)
+            track?.repeating = on
+            script = "set repeating to \(on)"
+        }
         queue.async {
             let allowed = Self.permission(ask: true)
             guard allowed == noErr else {
@@ -112,7 +132,7 @@ final class Spotify: ObservableObject {
                 DispatchQueue.main.async { MainActor.assumeIsolated { if denied { self.access = .denied } } }
                 return
             }
-            _ = Self.run(Self.whileRunning("\(command.rawValue)"))
+            _ = Self.run(Self.whileRunning(script))
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { MainActor.assumeIsolated { self.refresh(ask: false) } }
         }
     }
@@ -143,11 +163,35 @@ final class Spotify: ObservableObject {
     private func dropArtwork() {
         artwork = nil
         artworkURL = nil
+        lookingUp = nil
     }
 
-    /// The cover is the one network request the app makes: Spotify's own image server, over https (NowPlaying.parse checks the host).
+    /// The track whose oEmbed lookup is on its way, so one track is looked up once at a time.
+    private var lookingUp: String?
+
+    /// Spotify 1.3's AppleScript gives no cover link, so ask Spotify's oEmbed endpoint for the track's thumbnail.
+    private func lookUpArtwork() {
+        guard let id = trackID, id.hasPrefix("spotify:track:"), lookingUp != id,
+              var parts = URLComponents(string: "https://open.spotify.com/oembed") else { return }
+        parts.queryItems = [URLQueryItem(name: "url", value: id)]
+        guard let url = parts.url else { return }
+        lookingUp = id
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            let found = data.flatMap(NowPlaying.oembedThumbnail)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard self.lookingUp == id, self.trackID == id else { return }
+                    guard let found else { self.lookingUp = nil; return } // failed: the next change tries again
+                    self.track?.artworkURL = found
+                    self.loadArtwork()
+                }
+            }
+        }.resume()
+    }
+
+    /// The cover is the one thing the app fetches: Spotify's own image server, over https (NowPlaying checks the host).
     private func loadArtwork() {
-        guard let url = track?.artworkURL else { dropArtwork(); return }
+        guard let url = track?.artworkURL else { lookUpArtwork(); return }
         guard url != artworkURL else { return }
         artwork = nil // the old cover never sits next to the new song while this one loads
         artworkURL = url

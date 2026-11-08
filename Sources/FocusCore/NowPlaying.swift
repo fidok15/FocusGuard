@@ -30,6 +30,12 @@ public struct NowPlaying: Equatable, Sendable {
         return host.hasSuffix(".scdn.co") || host.hasSuffix(".spotifycdn.com") ? url : nil
     }
 
+    /// The cover link from Spotify's oEmbed reply (open.spotify.com/oembed), for when AppleScript gives none.
+    public static func oembedThumbnail(_ data: Data) -> URL? {
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        return (json?["thumbnail_url"] as? String).flatMap(URL.init(string:)).flatMap(spotifyImage)
+    }
+
     /// Parses "state␟title␟artist␟album␟artwork url␟shuffling␟repeating". A bare state (no track loaded) is nil.
     public static func parse(_ reply: String) -> NowPlaying? {
         let f = reply.split(separator: separator, omittingEmptySubsequences: false).map(String.init)
