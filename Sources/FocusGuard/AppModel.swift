@@ -19,14 +19,12 @@ final class AppModel: ObservableObject {
     @Published var nudgeText: String?
     /// Frames still arrive but none could be scored for a while (face turned away, poor light): no figure beats a stale one.
     @Published var focusStale = false
-    @Published var showSetup = false
     /// The settings and Spotify notes share one spot: opening one, from anywhere, puts the other away.
     @Published var showSettings = false { didSet { if showSettings { showMusic = false } } }
     /// The Spotify note over the record player.
     @Published var showMusic = false { didSet { if showMusic { showSettings = false } } }
     /// ⌃⌥⌘F could not be registered (another app owns it); the settings note says so.
     @Published var hotKeyTaken = false
-    @Published var confirmStop = false
     /// The × on the running session's card put it away for a clean room; a click on the clock brings it back.
     @Published var cardHidden = false
     /// Explains the camera on the card before the system prompt shows (first session only).
@@ -143,15 +141,13 @@ final class AppModel: ObservableObject {
     var timeOverride: TimeOfDay?
     /// Which card is showing above the clock; changing it plays the card's enter motion.
     var cardKey: String {
-        if confirmStop && clock.phase.isRunning { return "confirm" }
         switch clock.phase {
         case .study: return "study"
         case .rest: return "rest"
         case .idle, .done:
             if showCameraWhy { return "why" }
-            if showSetup { return "setup" }
             if clock.phase == .done { return "done" }
-            return seenHint ? "idle" : "hint"
+            return "idle"
         }
     }
     var remaining: TimeInterval { clock.remaining(at: monoNow) }
@@ -171,18 +167,13 @@ final class AppModel: ObservableObject {
         if alerting { return .alert }
         return clock.phase.isStudy && !clock.isPaused ? .studying : .idle
     }
-    /// "25 min, 5 min break, 4 rounds"
-    var summary: String {
-        String(localized: "\(config.studyMinutes) min, \(config.breakMinutes) min break, \(config.rounds) rounds")
-    }
 
     // MARK: Actions
 
-    /// Click on the clock or space while idle: start with the last-used settings, after the one-time camera explanation.
+    /// Start with the settings on the card, after the one-time camera explanation.
     func requestStart() {
         showSettings = false
         showMusic = false // the camera card must be seen, and the notes hide the card
-        showSetup = false
         if useCamera && !cameraExplained && AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
             showCameraWhy = true
         } else {
@@ -206,7 +197,6 @@ final class AppModel: ObservableObject {
         timerOnly = !(withCamera && useCamera)
         history = []
         nudges = 0
-        showSetup = false
         showCameraWhy = false
         pausedBySleep = false
         seenHint = true
@@ -221,7 +211,6 @@ final class AppModel: ObservableObject {
 
     func stop() {
         clock.stop()
-        confirmStop = false
         pausedBySleep = false
         phaseChanged()
     }
@@ -245,20 +234,17 @@ final class AppModel: ObservableObject {
         showMusic = false
         showCameraWhy = false
         if cardHidden && clock.phase.isRunning { cardHidden = false; return } // first click only brings the card back
-        if clock.phase.isRunning { confirmStop.toggle() } else { requestStart() }
+        if clock.phase.isRunning { togglePause() } else { requestStart() }
     }
 
     /// Space: start when idle, otherwise pause or resume.
     func spaceTapped() {
-        confirmStop = false
         if clock.phase.isRunning { togglePause() } else { requestStart() }
     }
 
     func toggleSettings() {
         showSettings.toggle()
         showMusic = false
-        showSetup = false
-        confirmStop = false
     }
 
     /// Click on the record player: what Spotify plays, with its controls. Asking now is what lets macOS show
@@ -266,7 +252,6 @@ final class AppModel: ObservableObject {
     func toggleMusic() {
         showMusic.toggle()
         showSettings = false
-        confirmStop = false
         if showMusic { spotify.refresh(ask: true) }
     }
 
@@ -291,7 +276,6 @@ final class AppModel: ObservableObject {
         showSettings = false
         showMusic = false
         showCameraWhy = false
-        confirmStop = false
     }
 
     func openCameraSettings() {
@@ -308,7 +292,6 @@ final class AppModel: ObservableObject {
             now = wall
             phaseChanged()
             phaseStart = wall
-            if !clock.phase.isRunning { confirmStop = false } // the question is moot once the session finished
             if let announcement = before.announcement(to: clock.phase) { announce(announcement) }
         }
         guard clock.phase.isStudy, !clock.isPaused else { return }

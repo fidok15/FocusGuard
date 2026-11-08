@@ -180,13 +180,11 @@ final class PanelController: NSObject {
         panel.setFrameOrigin(CGPoint(x: x, y: max(itemFrame.minY - size.height, visible.minY)))
     }
 
-    /// Esc steps back one layer (a note, confirm, camera card, setup) before it closes the panel.
+    /// Esc steps back one layer (a note, the camera card) before it closes the panel.
     private func escape() {
         if model.showSettings { model.showSettings = false }
         else if model.showMusic { model.showMusic = false }
-        else if model.confirmStop { model.confirmStop = false }
         else if model.showCameraWhy { model.showCameraWhy = false }
-        else if model.showSetup { model.showSetup = false }
         else { hide() }
     }
 
@@ -210,7 +208,7 @@ final class PanelController: NSObject {
             if event.isARepeat { return true } // holding space must not flip pause on and off
             if model.showMusic { model.spotify.send(.playPause); return true } // the record sleeve: space plays or pauses Spotify
             // Only the plain card answers space: a question or the note on top must not start or pause anything.
-            if model.showSettings || model.cardKey == "confirm" || model.cardKey == "why" { return true }
+            if model.showSettings || model.cardKey == "why" { return true }
             model.spaceTapped(); return true
         default: return false
         }

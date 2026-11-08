@@ -157,7 +157,7 @@ struct DeskScene: View {
         [("record", OutlineShape(groups: [tod.props.record]), "Spotify: now playing"),
          ("sticky", OutlineShape(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false), "Settings"),
          ("mug", OutlineShape(groups: [tod.props.mug]), "Pause / resume"),
-         ("clock", OutlineShape(groups: [tod.props.clock]), "Start or stop a study session"),
+         ("clock", OutlineShape(groups: [tod.props.clock]), "Start, pause or resume a study session"),
          ("cat", OutlineShape(groups: [tod.art.silhouette]), "Pet the cat")]
     }
 
@@ -193,7 +193,7 @@ struct DeskScene: View {
             Steam().place(Spots.steam).allowsHitTesting(false)
             ClockDisplay().allowsHitTesting(false)
 
-            Hotspot(groups: [tod.props.clock], lit: lit("clock"), help: "Start or stop a study session", action: model.clockTapped)
+            Hotspot(groups: [tod.props.clock], lit: lit("clock"), help: "Start, pause or resume a study session", action: model.clockTapped)
             Hotspot(groups: [tod.props.mug], lit: lit("mug"), help: "Pause / resume", action: model.togglePause)
             Hotspot(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, lit: lit("sticky"), help: "Settings") {
                 model.toggleSettings()

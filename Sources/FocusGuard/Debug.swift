@@ -29,9 +29,8 @@ enum DebugWindow {
         }
         if state == "nomusic" { model.showMusic = true }
         model.showPreview = false
-        if state == "setup" { model.showSetup = true }
         if state == "why" { model.cameraExplained = false; model.showCameraWhy = true }
-        if ["study", "paused", "sleep", "settings", "break", "done", "confirm", "nudge"].contains(state) {
+        if ["study", "paused", "sleep", "settings", "break", "done", "nudge"].contains(state) {
             model.start(withCamera: false) // no capture and no permission prompt; the card is told the camera runs
             model.timerOnly = false
             model.camera = .running
@@ -43,7 +42,6 @@ enum DebugWindow {
         }
         if state == "paused" || state == "sleep" { model.togglePause(); model.pausedBySleep = state == "sleep" }
         if state == "settings" { model.showSettings = true }
-        if state == "confirm" { model.confirmStop = true }
         if state == "nudge" { model.nudgeText = Lines.random(for: .lowFocus) }
         if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)); model.timeShift = 27 * 60 }
         if state == "done" { model.clock.tick(at: t0.addingTimeInterval(24 * 3600)); model.nudges = 2 }
@@ -108,8 +106,7 @@ enum Snapshots {
             print("wrote \(name)")
         }
         shot("1-idle-morning", .morning)
-        model.showSetup = true
-        shot("2-setup-day", .day)
+        shot("2-idle-day", .day)
         model.start(withCamera: false)
         model.timerOnly = false
         model.camera = .running

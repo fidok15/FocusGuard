@@ -46,6 +46,33 @@ struct TapeX: View {
     }
 }
 
+/// A × written in pencil and loosely circled, for closing a note from inside it.
+struct PencilX: View {
+    let help: LocalizedStringKey
+    let action: () -> Void
+    @StateObject private var hover = Box(false)
+
+    var body: some View {
+        Button(action: action) {
+            Path { p in
+                p.move(to: CGPoint(x: 0.5, y: 0.8)); p.addLine(to: CGPoint(x: 7.4, y: 7.8))
+                p.move(to: CGPoint(x: 7.7, y: 0.6)); p.addLine(to: CGPoint(x: 0.6, y: 7.5))
+            }
+            .stroke(Ink.pencil, style: StrokeStyle(lineWidth: hover.value ? 1.8 : 1.4, lineCap: .round))
+            .frame(width: 8, height: 8)
+            .padding(6)
+            .overlay { LooseEllipse(seed: 7).trim(from: 0, to: hover.value ? 1 : 0.82).stroke(Ink.pencil.opacity(0.7), lineWidth: 0.9) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .pencilFocus(action)
+        .onHover { hover.value = $0 }
+        .animation(.easeOut(duration: 0.18), value: hover.value)
+        .help(help)
+        .accessibilityLabel(Text(help))
+    }
+}
+
 /// Square sticky note with a curled bottom-right corner.
 private struct CurledNote: Shape {
     var curl: CGFloat = 14
@@ -112,9 +139,13 @@ struct SettingsNote: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("settings").font(Ink.hand(13))
-                .overlay(alignment: .bottom) { WavyLine(seed: 3).stroke(Ink.pencil.opacity(0.8), lineWidth: 1).frame(height: 3).offset(y: 3) }
-                .padding(.bottom, 4)
+            HStack(alignment: .top) {
+                Text("settings").font(Ink.hand(13))
+                    .overlay(alignment: .bottom) { WavyLine(seed: 3).stroke(Ink.pencil.opacity(0.8), lineWidth: 1).frame(height: 3).offset(y: 3) }
+                Spacer(minLength: 4)
+                PencilX(help: "Close settings") { model.showSettings = false }.offset(x: 4, y: -4)
+            }
+            .padding(.bottom, 4)
             Text("alert sensitivity").font(Ink.hand(12))
             HandSlider(value: $model.sensitivity)
             HStack {
@@ -217,7 +248,9 @@ struct MusicNote: View {
                                      startPoint: .top, endPoint: .bottom))
                 .shadow(color: .black.opacity(0.3), radius: 5, x: 1, y: 3)
         }
-        .overlay(alignment: .top) { WashiTape(width: 52, height: 13).rotationEffect(.degrees(3)).offset(x: 40, y: -6) }
+        .overlay(alignment: .topTrailing) {
+            TapeX(width: 44, height: 15, help: "Close") { model.showMusic = false }.offset(x: 12, y: -5)
+        }
         .rotationEffect(.degrees(1.5))
     }
 

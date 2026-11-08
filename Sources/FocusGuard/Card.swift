@@ -9,11 +9,8 @@ struct SessionCard: View {
 
     private static func size(_ key: String) -> CGSize {
         switch key {
-        case "idle": return CGSize(width: 196, height: 64)
-        case "hint": return CGSize(width: 196, height: 108)
+        case "idle": return CGSize(width: 196, height: 108)
         case "why": return CGSize(width: 196, height: 142)
-        case "confirm": return CGSize(width: 196, height: 74)
-        case "setup": return CGSize(width: 196, height: 132)
         default: return CGSize(width: 196, height: 116)
         }
     }
@@ -37,7 +34,7 @@ struct SessionCard: View {
                     if key == "study" || key == "rest" {
                         // The tape holding the card: its × takes the card down; the session keeps running.
                         TapeX(width: 44, height: 15, help: "Hide the card (click the clock to bring it back)") { model.cardHidden = true }
-                            .offset(x: size.width - 30, y: -12)
+                            .offset(x: size.width - 33, y: -5)
                     } else {
                         WashiTape(width: 34, height: 11).rotationEffect(.degrees(-5)).offset(x: size.width - 48, y: -2)
                     }
@@ -108,14 +105,6 @@ private struct CardContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch key {
-            case "confirm":
-                RuledRow(height: 20) { Text("stop session?").font(Ink.hand(13)) }
-                RuledRow(height: 20, seed: 1) {
-                    HStack(spacing: 18) {
-                        BoxChoice(title: "yes", action: model.stop)
-                        BoxChoice(title: "no") { model.confirmStop = false }
-                    }
-                }
             case "study":
                 if case .study(let round) = model.clock.phase {
                     PhaseHeader(title: "study \(round) of \(model.clock.config.rounds)")
@@ -150,18 +139,6 @@ private struct CardContent: View {
                     Text(model.clock.isPaused ? pausedLine : String(localized: "stretch, drink some water")).font(Ink.hand(12))
                 }
                 RuledRow(height: 18, seed: 3) { Text("camera is off").font(Ink.hand(11)).opacity(0.75) }
-            case "setup":
-                StepRow(label: "study", value: $model.config.studyMinutes, range: 5...90, step: 5, unit: "min", seed: 0)
-                StepRow(label: "break", value: $model.config.breakMinutes, range: 1...30, step: 1, unit: "min", seed: 1)
-                StepRow(label: "rounds", value: $model.config.rounds, range: 1...8, step: 1, unit: "×", seed: 2)
-                RuledRow(height: 26, seed: 3) {
-                    HStack {
-                        WordLink(title: "start", size: 13, underlined: true, action: model.requestStart)
-                        Spacer(minLength: 4)
-                        WordLink(title: "done", size: 11) { model.showSetup = false }
-                    }
-                }
-                RuledRow(height: 18, seed: 4) { Text("camera only while studying").font(Ink.hand(11)).lineLimit(1).minimumScaleFactor(0.9) }
             case "why":
                 RuledRow(height: 18) { Text("about the camera").font(Ink.hand(12)) }
                 Text("FocusGuard looks at you through the camera only while you study. Nothing is saved or sent anywhere.")
@@ -203,29 +180,20 @@ private struct CardContent: View {
                 }
                 RuledRow(height: 18, seed: 3) {
                     HStack {
-                        WordLink(title: "adjust", size: 12) { model.showSetup = true }
+                        WordLink(title: "adjust", size: 12, action: model.stop) // back to the idle card and its settings
                         Spacer(minLength: 4)
                         WordLink(title: "new session", size: 12, underlined: true, action: model.requestStart)
                     }
                 }
-            case "hint":
-                RuledRow(height: 20) { Text("click the clock to").font(Ink.hand(12)) }
-                RuledRow(height: 20, seed: 1) { Text("start a study session").font(Ink.hand(12)) }
-                RuledRow(height: 20, seed: 2) { SummaryLine() }
-                RuledRow(height: 22, seed: 3) {
-                    HStack {
-                        WordLink(title: "adjust", size: 12) { model.showSetup = true }
+            default: // idle: the session's settings right on the card, and start
+                StepRow(label: "study", value: $model.config.studyMinutes, range: 5...90, step: 5, unit: "min", seed: 0)
+                StepRow(label: "break", value: $model.config.breakMinutes, range: 1...30, step: 1, unit: "min", seed: 1)
+                StepRow(label: "rounds", value: $model.config.rounds, range: 1...8, step: 1, unit: "×", seed: 2)
+                RuledRow(height: 26, seed: 3) {
+                    HStack(alignment: .lastTextBaseline) {
+                        WordLink(title: "start", size: 13, underlined: true, action: model.requestStart)
                         Spacer(minLength: 4)
-                        WordLink(title: "start", size: 12, underlined: true, action: model.requestStart)
-                    }
-                }
-            default:
-                RuledRow(height: 20) { SummaryLine() }
-                RuledRow(height: 22, seed: 1) {
-                    HStack {
-                        WordLink(title: "adjust", size: 12) { model.showSetup = true }
-                        Spacer(minLength: 4)
-                        WordLink(title: "start", size: 12, underlined: true, action: model.requestStart)
+                        if !model.seenHint { Text("or click the clock").font(Ink.hand(11)).opacity(0.75) }
                     }
                 }
             }
@@ -238,7 +206,7 @@ private struct CardContent: View {
     }
 }
 
-/// "study 2 of 4" with the pause / resume word on the right (the mug does the same).
+/// "study 2 of 4" with pause / resume and stop on the right. Paused shows in the greyed time and the line below.
 private struct PhaseHeader: View {
     @EnvironmentObject var model: AppModel
     let title: LocalizedStringKey
@@ -247,7 +215,6 @@ private struct PhaseHeader: View {
         RuledRow(height: 17) {
             HStack(spacing: 0) {
                 Text(title)
-                if model.clock.isPaused { Text("paused").foregroundStyle(Ink.red).padding(.leading, 6) }
                 Spacer(minLength: 4)
                 WordLink(title: model.clock.isPaused ? "resume" : "pause", size: 12, action: model.togglePause)
                 WordLink(title: "stop", size: 12, action: model.stop).padding(.leading, 9)
@@ -255,14 +222,6 @@ private struct PhaseHeader: View {
             .padding(.trailing, 14) // clear of the tape on the corner
             .font(Ink.hand(12))
         }
-    }
-}
-
-private struct SummaryLine: View {
-    @EnvironmentObject var model: AppModel
-
-    var body: some View {
-        Text(verbatim: model.summary).font(Ink.hand(11)).lineLimit(1).minimumScaleFactor(0.9)
     }
 }
 
