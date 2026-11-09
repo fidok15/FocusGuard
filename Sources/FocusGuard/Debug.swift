@@ -10,7 +10,7 @@ import SwiftUI
 enum DebugWindow {
     static var window: NSWindow?
 
-    /// States: idle (default), hint, setup, why, study, paused, sleep, settings, break, confirm, done, bubble, music, nomusic, nudge.
+    /// States: idle (default), hint, why, study, paused, sleep, settings, break, done, bubble, music, nomusic, nudge.
     /// `--large` draws the bigger panel.
     static func configure(_ model: AppModel) {
         model.persists = false // fixtures never touch the user's settings
@@ -118,6 +118,11 @@ enum Snapshots {
         model.showSettings = true
         shot("4-settings-night", .night)
         model.showSettings = false
+        model.spotify.preview(NowPlaying(playing: true, title: "Lofi Rain on the Window", artist: "Kitty Beats", shuffling: true),
+                              artwork: TimeOfDay.night.art.catFace)
+        model.showMusic = true
+        shot("4b-music-night", .night)
+        model.showMusic = false
         model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1))
         model.timeShift = 27 * 60
         shot("5-break-day", .day)
