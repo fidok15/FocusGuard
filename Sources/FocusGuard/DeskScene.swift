@@ -5,25 +5,28 @@ import SwiftUI
 
 // MARK: - Layout
 
-/// Scene size in points. The art is 16:9-ish (2752×1536).
+/// Scene size in points. The art is 2000x1116.
 let W: CGFloat = 720
 let H: CGFloat = 402
+/// Transparent margin around the scene inside the panel, so the drop shadow of the art and its pop-outs is not cut off.
+let PAD: CGFloat = 14
+/// The opaque picture does not reach the edges of the 2000x1116 canvas, so the panel shows only this part of it (scene points).
+let OX: CGFloat = 9, OY: CGFloat = 29.5, CW: CGFloat = 706, CH: CGFloat = 346
 
-/// Rect in the 2000×1116 coordinate space the art was measured in, normalized to 0…1.
+/// Art space (2000x1116) to scene points.
+func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x / 2000 * W, y: y / 1116 * H) }
+
+/// Rect in the 2000x1116 coordinate space the art was measured in, normalized to 0...1.
 private func R(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> CGRect {
     CGRect(x: x / 2000, y: y / 1116, width: w / 2000, height: h / 1116)
 }
 
-/// Objects drawn in the same place in all four scenes.
+/// Places that are the same in all four scenes (art coordinates). Everything that differs per scene lives in `Props`.
 enum Spots {
-    static let timer = R(375, 640, 175, 185)
-    static let dial = R(418, 683, 104, 104)
-    static let leftPage = R(684, 818, 308, 180)
-    static let rightPage = R(1014, 818, 312, 180)
-    static let mug = R(1390, 680, 165, 155)
-    static let steam = R(1400, 540, 110, 150)
-    static let stickyNotes = R(1475, 860, 265, 85)
-    static let polaroid = R(40, 40, 240, 215)
+    /// Where the card's tail points: the middle of the clock's top edge.
+    static let clockTop = P(600, 650)
+    static let steam = R(1320, 500, 130, 160)
+    static let polaroid = R(1540, 175, 210, 150)
 }
 
 extension View {
@@ -56,36 +59,45 @@ final class Box<T>: ObservableObject {
 struct SceneArt {
     let url: URL?
     let image: NSImage?
-    /// Where the cat lies in this scene (normalized).
-    let cat: CGRect
+    /// Outline of the cat in this scene (art coordinates).
+    let silhouette: [CGPoint]
+    /// Center and radius of the cat's head (art coordinates), used for the bubble face and the petting effects.
     let head: CGPoint
     let headRadius: CGFloat
-    var silhouette: [CGPoint] = []
 
-    init(url: URL?, cat: CGRect, head: CGPoint, headRadius: CGFloat, silhouette: [CGPoint] = []) {
-        self.silhouette = silhouette
+    init(url: URL?, silhouette: [CGPoint], head: CGPoint, headRadius: CGFloat) {
         self.url = url
         self.image = url.flatMap(NSImage.init(contentsOf:))
-        self.cat = cat
+        self.silhouette = silhouette
         self.head = head
         self.headRadius = headRadius
     }
 
-    /// Round crop of the cat's head, used in the speech bubble.
+    /// Cat head in scene points.
+    var headPoint: CGPoint { P(head.x, head.y) }
+
+    /// Breathing grows the cat upwards from the middle of its underside.
+    var anchor: UnitPoint {
+        let xs = silhouette.map(\.x), ys = silhouette.map(\.y)
+        return UnitPoint(x: ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2 / 2000, y: (ys.max() ?? 0) / 1116)
+    }
+
+    /// Round crop of the cat's head, used in the speech bubble. The PNG is 2000 px wide, so art coordinates are pixels.
     var catFace: NSImage? {
         guard let url, let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cg = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-        let pw = CGFloat(cg.width), ph = CGFloat(cg.height), r = headRadius * pw
-        let crop = CGRect(x: head.x * pw - r, y: head.y * ph - r, width: r * 2, height: r * 2)
-        guard let face = cg.cropping(to: crop) else { return nil }
-        let image = NSImage(size: crop.size)
+        let full = CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+        let r = headRadius * CGFloat(cg.width) / 2000
+        let crop = CGRect(x: head.x * CGFloat(cg.width) / 2000 - r, y: head.y * CGFloat(cg.height) / 1116 - r, width: r * 2, height: r * 2)
+        guard let face = cg.cropping(to: crop.intersection(full)) else { return nil }
+        let image = NSImage(size: NSSize(width: face.width, height: face.height))
         image.addRepresentation(NSBitmapImageRep(cgImage: face))
         return image
     }
 
     static func locate(_ name: String) -> URL? {
-        if let url = Bundle.main.url(forResource: name, withExtension: "jpg") { return url }
-        let dev = URL(fileURLWithPath: "art/\(name).jpeg") // `swift run` from the repo root
+        if let url = Bundle.main.url(forResource: name, withExtension: "png") { return url }
+        let dev = URL(fileURLWithPath: "art/\(name).png") // `swift run` from the repo root
         return FileManager.default.fileExists(atPath: dev.path) ? dev : nil
     }
 }
@@ -103,23 +115,63 @@ enum TimeOfDay: CaseIterable {
     }
 
     var art: SceneArt { Self.arts[self]! }
+    var props: Props { self == .day ? .day : self == .sunset ? .sunset : .morning }
 
     private static let arts: [TimeOfDay: SceneArt] = [
-        .morning: SceneArt(url: SceneArt.locate("scene_morning"), cat: R(815, 425, 405, 180),
-                           head: CGPoint(x: 905.0 / 2000, y: 512.0 / 1116), headRadius: 0.035, silhouette: Silhouette.catMorning),
-        .day: SceneArt(url: SceneArt.locate("scene_day"), cat: R(1715, 495, 285, 270),
-                       head: CGPoint(x: 1785.0 / 2000, y: 560.0 / 1116), headRadius: 0.035, silhouette: Silhouette.catDay),
-        .sunset: SceneArt(url: SceneArt.locate("scene_sunset"), cat: R(1305, 265, 240, 350),
-                          head: CGPoint(x: 1420.0 / 2000, y: 320.0 / 1116), headRadius: 0.033, silhouette: Silhouette.catSunset),
-        .night: SceneArt(url: SceneArt.locate("scene_night"), cat: R(40, 750, 505, 265),
-                         head: CGPoint(x: 445.0 / 2000, y: 860.0 / 1116), headRadius: 0.038, silhouette: Silhouette.catNight),
+        .morning: SceneArt(url: SceneArt.locate("scene_morning"), silhouette: Silhouette.catMorning,
+                           head: CGPoint(x: 1000, y: 612), headRadius: 56),
+        .day: SceneArt(url: SceneArt.locate("scene_day"), silhouette: Silhouette.catDay,
+                       head: CGPoint(x: 898, y: 552), headRadius: 36),
+        .sunset: SceneArt(url: SceneArt.locate("scene_sunset"), silhouette: Silhouette.catSunset,
+                          head: CGPoint(x: 1660, y: 655), headRadius: 52),
+        .night: SceneArt(url: SceneArt.locate("scene_night"), silhouette: Silhouette.catNight,
+                         head: CGPoint(x: 1525, y: 858), headRadius: 60),
     ]
 }
 
 // MARK: - Scene
 
+/// Panel size in points at normal scale: the visible scene plus the shadow margin.
+let panelSize = CGSize(width: CW + 2 * PAD, height: CH + 2 * PAD)
+
+/// What the panel and the debug window show: the scene with a transparent margin for the shadow.
+struct PanelRoot: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        let s = model.panelScale
+        DeskScene().offset(x: -OX, y: -OY).frame(width: CW, height: CH, alignment: .topLeading).padding(PAD)
+            .scaleEffect(s, anchor: .topLeading)
+            .frame(width: panelSize.width * s, height: panelSize.height * s, alignment: .topLeading)
+    }
+}
+
 struct DeskScene: View {
     @EnvironmentObject var model: AppModel
+    /// The object under the pointer. macOS gives hover only to the topmost view under the pointer by its frame, not its
+    /// shape, and every hotspot spans the whole scene, so the scene itself decides by outline (see `hover(at:)`).
+    @StateObject private var hovered = Box<String?>(nil)
+
+    /// Hover targets, topmost first, matching the order the hotspots are stacked in below.
+    private func targets(_ tod: TimeOfDay) -> [(name: String, shape: OutlineShape, help: LocalizedStringKey)] {
+        [("record", OutlineShape(groups: [tod.props.record]), "Spotify: now playing"),
+         ("sticky", OutlineShape(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false), "Settings"),
+         ("mug", OutlineShape(groups: [tod.props.mug]), "Pause / resume"),
+         ("clock", OutlineShape(groups: [tod.props.clock]), "Start, pause or resume a study session"),
+         ("cat", OutlineShape(groups: [tod.art.silhouette]), "Pet the cat")]
+    }
+
+    private func hover(at point: CGPoint?, _ tod: TimeOfDay) {
+        let frame = CGRect(x: 0, y: 0, width: W, height: H)
+        let notes = model.showSettings || model.showMusic // a note covers the room; its tap catcher takes the clicks
+        let name = notes ? nil : point.flatMap { p in targets(tod).first { $0.shape.path(in: frame).contains(p) }?.name }
+        guard name != hovered.value else { return }
+        if hovered.value != nil { NSCursor.pop() }
+        if let name { (name == "cat" ? NSCursor.openHand : NSCursor.pointingHand).push() }
+        hovered.value = name
+    }
+
+    private func lit(_ name: String) -> Bool { hovered.value == name || forcedHover?.contains(name) == true }
 
     var body: some View {
         let tod = model.timeOfDay
@@ -127,6 +179,7 @@ struct DeskScene: View {
             Group {
                 if let image = tod.art.image {
                     Image(nsImage: image).resizable().frame(width: W, height: H)
+                        .shadow(color: .black.opacity(0.4), radius: 7, y: 3) // follows the alpha, pop-outs included
                 } else {
                     LinearGradient(colors: [.cyan.opacity(0.4), .brown.opacity(0.5)], startPoint: .top, endPoint: .bottom)
                 }
@@ -134,69 +187,83 @@ struct DeskScene: View {
             .id(tod)
             .transition(.opacity)
 
-            CatLayer(art: tod.art).id(tod)
+            CatLayer(art: tod.art, lit: lit("cat")).id(tod)
 
+            RecordSpin(image: tod.art.image, props: tod.props).id(tod).allowsHitTesting(false)
             Steam().place(Spots.steam).allowsHitTesting(false)
-            TimerFace().place(Spots.dial).allowsHitTesting(false)
+            ClockDisplay().allowsHitTesting(false)
 
-            Hotspot(name: "timer", groups: [Silhouette.timer], help: "Set study time", action: model.timerTapped)
-            Hotspot(name: "mug", groups: [Silhouette.mug], help: "Pause / resume", action: model.togglePause)
-            Hotspot(name: "sticky", groups: [Silhouette.pinkNote, Silhouette.greenNote], smooth: false, help: "Settings") {
-                model.showSettings.toggle()
-                model.showSetup = false
+            Hotspot(groups: [tod.props.clock], lit: lit("clock"), help: "Start, pause or resume a study session", action: model.clockTapped)
+            Hotspot(groups: [tod.props.mug], lit: lit("mug"), help: "Pause / resume", action: model.togglePause)
+            Hotspot(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, lit: lit("sticky"), help: "Settings") {
+                model.toggleSettings()
             }
+            Hotspot(groups: [tod.props.record], lit: lit("record"), help: "Spotify: now playing", action: model.toggleMusic)
 
-            SessionCard()
+            // A note takes the card's place; the card's × hides it until the clock is clicked.
+            if !model.showSettings && !model.showMusic && !(model.cardHidden && model.cardKey != "why") { SessionCard() }
 
             if model.showPreview && model.camera == .running {
                 Polaroid(session: model.cameraService.session).place(Spots.polaroid)
                     .transition(.scale.combined(with: .opacity))
             }
 
-            QuitButton().position(x: W - 21, y: 21)
-
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
                 SettingsNote()
-                    .position(x: W * 0.8, y: H * 0.755)
-                    .transition(.scale(scale: 0.8, anchor: .bottomTrailing).combined(with: .opacity))
+                    .position(x: 128, y: 146) // room above for the extra red lines (login, hot key)
+                    .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
+
+            if model.showMusic {
+                Color.black.opacity(0.001).onTapGesture { model.showMusic = false }
+                MusicNote()
+                    .position(x: 150, y: 150)
+                    .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
+            }
+
+            CloseButton().position(x: 622, y: 52) // on the top-right corner of the room, above the notes' tap catchers
         }
         .frame(width: W, height: H)
-        .clipped()
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            if case .active(let p) = phase { hover(at: p, tod) } else { hover(at: nil, tod) }
+        }
+        .onChange(of: model.showSettings || model.showMusic) { hover(at: nil, tod) }
+        .onDisappear { hover(at: nil, tod) }
+        // The tooltip follows the object under the pointer (a per-hotspot .help would also go by frame).
+        .help(hovered.value.flatMap { name in targets(tod).first { $0.name == name }?.help } ?? "")
         .fixedSize()
         .coordinateSpace(name: "scene")
         .animation(.easeInOut(duration: 1.2), value: tod)
         .animation(.spring(duration: 0.3), value: model.showSettings)
+        .animation(.spring(duration: 0.3), value: model.showMusic)
         .animation(.spring(duration: 0.3), value: model.showPreview && model.camera == .running)
         .animation(.easeOut(duration: 0.25), value: model.cardKey)
+        .animation(.easeOut(duration: 0.25), value: model.cardHidden)
     }
 }
 
-/// Invisible clickable area shaped exactly like an object in the art, with a soft glow on hover.
+/// Invisible clickable area shaped exactly like an object in the art, with a soft glow while the scene says it is hovered.
 private struct Hotspot: View {
-    let name: String
     let groups: [[CGPoint]]
     var smooth = true
+    let lit: Bool
     let help: LocalizedStringKey
     let action: () -> Void
-    @StateObject private var hover = Box(false)
 
     var body: some View {
         let shape = OutlineShape(groups: groups, smooth: smooth)
         ZStack {
-            HoverGlow(shape: shape, on: hover.value || forcedHover?.contains(name) == true)
+            HoverGlow(shape: shape, on: lit)
             shape.fill(Color.white.opacity(0.001))
         }
         .frame(width: W, height: H)
-        .contentShape(shape)
-        .onHover { inside in
-            hover.value = inside
-            inside ? NSCursor.pointingHand.push() : NSCursor.pop()
-        }
-        .onDisappear { if hover.value { NSCursor.pop(); hover.value = false } }
+        .accessibilityElement()
+        .accessibilityLabel(Text(help))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { action() }
+        .contentShape(shape) // clicks do go by shape
         .onTapGesture(perform: action)
-        .help(help)
     }
 }
 
@@ -215,13 +282,22 @@ private var calmMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldRedu
 /// All motion is a pure function of the clock, so nothing can capture the window's own layout animation.
 private struct CatLayer: View {
     let art: SceneArt
+    let lit: Bool
     @StateObject private var pets = Box<[Pet]>([])
     @StateObject private var lastPoint = Box<CGPoint?>(nil)
-    @StateObject private var hovering = Box(false)
     @StateObject private var stroke = Box<CGFloat>(0)
 
     private var catShape: OutlineShape { OutlineShape(groups: [art.silhouette]) }
-    private var anchor: UnitPoint { UnitPoint(x: art.cat.midX, y: art.cat.maxY) }
+    private var anchor: UnitPoint { art.anchor }
+    /// The cat's outline grown a little and feathered, so the breathing copy blends into the still art without a seam.
+    private var breathingMask: some View {
+        ZStack {
+            catShape.fill(Color.black)
+            catShape.stroke(Color.black, style: StrokeStyle(lineWidth: 9, lineJoin: .round))
+        }
+        .frame(width: W, height: H)
+        .blur(radius: 3)
+    }
 
     /// Damped bounce after a pet: positive = squashed.
     private func squish(at date: Date) -> CGFloat {
@@ -240,24 +316,20 @@ private struct CatLayer: View {
                     let s = calmMotion ? 0 : squish(at: context.date)
                     Image(nsImage: image).resizable().frame(width: W, height: H)
                         .scaleEffect(x: 1 + 0.004 * b + 0.016 * s, y: 1 + 0.014 * b - 0.026 * s, anchor: anchor)
-                        .mask { Ellipse().place(art.cat.insetBy(dx: -0.012, dy: -0.012)).blur(radius: 8) }
+                        .mask { breathingMask }
                 }
                 .allowsHitTesting(false)
             }
 
-            HoverGlow(shape: catShape, on: hovering.value || forcedHover?.contains("cat") == true)
+            HoverGlow(shape: catShape, on: lit)
             catShape.fill(Color.white.opacity(0.001))
-                .onHover { inside in
-                    hovering.value = inside
-                    inside ? NSCursor.openHand.push() : NSCursor.pop()
-                }
-                .onDisappear { if hovering.value { NSCursor.pop(); hovering.value = false } }
+                .contentShape(catShape)
                 .gesture(petting)
-                .help("Pet the cat")
+                .accessibilityLabel(Text("Pet the cat"))
 
             if !pets.value.isEmpty {
                 TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-                    PetEffects(pets: pets.value, now: context.date, head: art.head)
+                    PetEffects(pets: pets.value, now: context.date, head: art.headPoint)
                 }
                 .allowsHitTesting(false)
             }
@@ -267,7 +339,7 @@ private struct CatLayer: View {
             #if DEBUG
             if CommandLine.arguments.contains("--autopet") {
                 Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
-                    Task { @MainActor in pet(at: CGPoint(x: art.head.x * W + 30, y: art.head.y * H), hearts: 3) }
+                    Task { @MainActor in pet(at: CGPoint(x: art.headPoint.x + 30, y: art.headPoint.y), hearts: 3) }
                 }
             }
             #endif
@@ -332,7 +404,7 @@ private struct PetEffects: View {
                     .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
                     .rotationEffect(.degrees(-4))
                     .opacity(a)
-                    .position(x: head.x * W + 48, y: head.y * H - 58 - CGFloat(min(age, 1)) * 4)
+                    .position(x: min(head.x + 34, W - 34), y: max(head.y - 44, 14) - CGFloat(min(age, 1)) * 4)
             }
         }
         .frame(width: W, height: H, alignment: .topLeading)
@@ -341,14 +413,18 @@ private struct PetEffects: View {
 
 // MARK: - Desk objects
 
-/// Three soft wisps rising and fading above the mug.
+/// Three soft wisps rising and fading above the mug. A paused session lets the steam die away.
 private struct Steam: View {
+    @EnvironmentObject var model: AppModel
+
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30)) { context in
             Canvas { ctx, size in
                 Self.draw(in: &ctx, size: size, time: calmMotion ? 3 : context.date.timeIntervalSinceReferenceDate)
             }
         }
+        .opacity(model.clock.isPaused ? 0 : 1)
+        .animation(.easeOut(duration: 0.7), value: model.clock.isPaused)
     }
 
     // Kept out of the view builder with explicit types: older compilers time out type-checking it inline.
@@ -358,11 +434,11 @@ private struct Steam: View {
         for i in 0..<3 {
             let n = Double(i)
             let phase: Double = (t * 0.22 + n / 3).truncatingRemainder(dividingBy: 1)
-            let baseX: Double = w * (0.32 + 0.16 * n)
+            let baseX: Double = w * (0.3 + 0.2 * n)
             var path = Path()
             for k in 0...24 {
                 let f: Double = phase * 0.55 + Double(k) / 24 * 0.45 // segment of the column, rising with phase
-                let wobble: Double = sin(f * 7 + t * 1.3 + n * 2.1) * w * 0.16 * f
+                let wobble: Double = sin(f * 7 + t * 1.3 + n * 2.1) * w * 0.14 * f
                 let point = CGPoint(x: baseX + wobble, y: h * (1 - f))
                 if k == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }
@@ -372,33 +448,222 @@ private struct Steam: View {
     }
 }
 
-/// Red wedge of remaining time on the kitchen timer dial (green during breaks). Sweeps in once when a session starts.
-private struct TimerFace: View {
+/// LCD digits on the desk clock's dark glass. Idle: the time with a blinking colon. Study: green countdown.
+/// Break: amber countdown. Paused: the countdown blinks. A short flash plays when a session or phase starts.
+private struct ClockDisplay: View {
     @EnvironmentObject var model: AppModel
 
+    private static let green = Color(red: 0.55, green: 0.95, blue: 0.62)
+    private static let amber = Color(red: 1, green: 0.74, blue: 0.3)
+
+    /// Bounding box of the glass in art coordinates.
+    private var box: CGRect {
+        let q = model.timeOfDay.props.lcd
+        let x0 = q.map(\.x).min()! - 4, y0 = q.map(\.y).min()! - 4
+        return CGRect(x: x0, y: y0, width: q.map(\.x).max()! + 4 - x0, height: q.map(\.y).max()! + 4 - y0)
+    }
+
     var body: some View {
-        let settled = Date().timeIntervalSince(model.phaseStart) > 0.8
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: settled)) { context in
+        let box = box
+        TimelineView(.animation(minimumInterval: 0.1)) { context in
             Canvas { ctx, size in
-                guard model.clock.phase.isRunning else { return }
-                let age = context.date.timeIntervalSince(model.phaseStart)
-                let u = calmMotion ? 1 : min(max(age / 0.6, 0), 1)
-                let sweep = 1 - (1 - u) * (1 - u) * (1 - u)
-                let c = CGPoint(x: size.width / 2, y: size.height / 2)
-                let r = min(size.width, size.height) / 2 * 0.82
-                let end = Angle.degrees(-90 + 360 * model.remainingFraction * sweep)
-                var wedge = Path()
-                wedge.move(to: c)
-                wedge.addArc(center: c, radius: r, startAngle: .degrees(-90), endAngle: end, clockwise: false)
-                wedge.closeSubpath()
-                let color = model.clock.phase.isStudy ? Ink.red : Ink.green
-                ctx.fill(wedge, with: .color(color.opacity(model.clock.isPaused ? 0.4 : 0.78)))
-                var hand = Path()
-                hand.move(to: c)
-                hand.addLine(to: CGPoint(x: c.x + cos(end.radians) * r, y: c.y + sin(end.radians) * r))
-                ctx.stroke(hand, with: .color(Ink.pencil), lineWidth: 1.5)
-                ctx.fill(Path(ellipseIn: CGRect(x: c.x - 2.5, y: c.y - 2.5, width: 5, height: 5)), with: .color(Ink.pencil))
+                draw(in: &ctx, size: size, date: context.date, box: box)
             }
+        }
+        .frame(width: box.width / 2000 * W, height: box.height / 1116 * H)
+        .position(x: box.midX / 2000 * W, y: box.midY / 1116 * H)
+    }
+
+    private func draw(in ctx: inout GraphicsContext, size: CGSize, date: Date, box: CGRect) {
+        let phase = model.clock.phase, paused = model.clock.isPaused
+        let second = date.timeIntervalSinceReferenceDate
+        let digits: [Int]
+        var colon = true
+        switch phase {
+        case .idle, .done:
+            digits = ClockText.wall(date)
+            colon = Int(second.rounded(.down)) % 2 == 0
+        case .study, .rest:
+            digits = ClockText.countdown(model.remaining)
+        }
+        let color = phase.isRunning ? (phase.isStudy ? Self.green : Self.amber) : Self.green
+        var level = phase.isRunning ? 1.0 : 0.7
+        if paused && second - second.rounded(.down) > 0.55 { level = 0.06 } // blink
+        let age = date.timeIntervalSince(model.phaseStart)
+        let flash = age >= 0 && age < 0.9 && !calmMotion ? (1 - age / 0.9) * abs(sin(age * .pi * 2.6)) : 0
+
+        let scale = size.width / box.width
+        let spec = LCDLayout(box: box, lcd: model.timeOfDay.props.lcd, scale: scale)
+        // Faint unlit segments, like real LCD glass.
+        spec.draw(&ctx, digits: [8, 8, 8, 8], colon: true, color: color.opacity(0.07))
+        ctx.drawLayer { layer in
+            layer.addFilter(.blur(radius: 2.2 * scale / 0.36))
+            spec.draw(&layer, digits: digits, colon: colon, color: color.opacity(0.7 * level + flash))
+        }
+        spec.draw(&ctx, digits: digits, colon: colon, color: color.opacity(level))
+        if flash > 0 {
+            ctx.fill(spec.glassPath(), with: .color(color.opacity(0.28 * flash)))
+            spec.draw(&ctx, digits: digits, colon: colon, color: .white.opacity(0.8 * flash))
+        }
+    }
+}
+
+/// Seven-segment digits laid out on the clock's sheared glass (art coordinates mapped through the glass quad).
+private struct LCDLayout {
+    let box: CGRect
+    let lcd: [CGPoint]
+    let scale: CGFloat
+
+    private let digitW: CGFloat = 36, digitH: CGFloat = 50, thick: CGFloat = 7, slant: CGFloat = 0.12
+    private let glassW: CGFloat = 207, glassH: CGFloat = 66
+
+    /// Glass-local coordinates (0...207, 0...66) to canvas points, bilinear over the measured quad.
+    private func map(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        let q = lcd, u = x / glassW, v = y / glassH
+        let ax = (1 - u) * (1 - v) * q[0].x + u * (1 - v) * q[1].x + u * v * q[2].x + (1 - u) * v * q[3].x
+        let ay = (1 - u) * (1 - v) * q[0].y + u * (1 - v) * q[1].y + u * v * q[2].y + (1 - u) * v * q[3].y
+        return CGPoint(x: (ax - box.minX) * scale, y: (ay - box.minY) * scale)
+    }
+
+    func glassPath() -> Path {
+        var p = Path()
+        p.move(to: map(0, 0)); p.addLine(to: map(glassW, 0)); p.addLine(to: map(glassW, glassH)); p.addLine(to: map(0, glassH))
+        p.closeSubpath()
+        return p
+    }
+
+    private func poly(_ pts: [CGPoint], dx: CGFloat, dy: CGFloat) -> Path {
+        var p = Path()
+        for (i, pt) in pts.enumerated() {
+            // Italic lean: shift x by how far above the digit's middle the point is.
+            let q = map(pt.x + dx + slant * (digitH / 2 - pt.y), pt.y + dy)
+            i == 0 ? p.move(to: q) : p.addLine(to: q)
+        }
+        p.closeSubpath()
+        return p
+    }
+
+    private func segment(_ index: Int, x0: CGFloat, y0: CGFloat) -> Path {
+        let t = thick, w = digitW, h = digitH
+        func horizontal(_ yc: CGFloat) -> [CGPoint] {
+            [CGPoint(x: t * 0.55, y: yc), CGPoint(x: t * 1.1, y: yc - t / 2), CGPoint(x: w - t * 1.1, y: yc - t / 2),
+             CGPoint(x: w - t * 0.55, y: yc), CGPoint(x: w - t * 1.1, y: yc + t / 2), CGPoint(x: t * 1.1, y: yc + t / 2)]
+        }
+        func vertical(_ xc: CGFloat, _ top: CGFloat, _ bottom: CGFloat) -> [CGPoint] {
+            [CGPoint(x: xc, y: top + t * 0.55), CGPoint(x: xc + t / 2, y: top + t * 1.05), CGPoint(x: xc + t / 2, y: bottom - t * 1.05),
+             CGPoint(x: xc, y: bottom - t * 0.55), CGPoint(x: xc - t / 2, y: bottom - t * 1.05), CGPoint(x: xc - t / 2, y: top + t * 1.05)]
+        }
+        let pts: [CGPoint]
+        switch index {
+        case 0: pts = horizontal(t / 2)
+        case 1: pts = vertical(w - t / 2, 0, h / 2 + t * 0.3)
+        case 2: pts = vertical(w - t / 2, h / 2 - t * 0.3, h)
+        case 3: pts = horizontal(h - t / 2)
+        case 4: pts = vertical(t / 2, h / 2 - t * 0.3, h)
+        case 5: pts = vertical(t / 2, 0, h / 2 + t * 0.3)
+        default: pts = horizontal(h / 2)
+        }
+        return poly(pts, dx: x0, dy: y0)
+    }
+
+    func draw(_ ctx: inout GraphicsContext, digits: [Int], colon: Bool, color: Color) {
+        let total: CGFloat = 4 * digitW + 2 * 6 + 22
+        let left = (glassW - total) / 2 - 2, top = (glassH - digitH) / 2 + 1
+        let xs: [CGFloat] = [left, left + digitW + 6, left + 2 * digitW + 6 + 22, left + 3 * digitW + 12 + 22]
+        for (i, digit) in digits.enumerated() {
+            let mask = SevenSegment.mask(digit)
+            for s in 0..<7 where mask & (1 << UInt8(s)) != 0 {
+                ctx.fill(segment(s, x0: xs[i], y0: top), with: .color(color))
+            }
+        }
+        if colon {
+            let cx = left + 2 * digitW + 6 + 11 - 0.5
+            for cy in [top + digitH * 0.32, top + digitH * 0.68] {
+                var p = Path()
+                for (i, c) in [CGPoint(x: -1, y: -1), CGPoint(x: 1, y: -1), CGPoint(x: 1, y: 1), CGPoint(x: -1, y: 1)].enumerated() {
+                    let q = map(cx + c.x * thick * 0.45 + slant * (digitH / 2 - (cy - top)), cy + c.y * thick * 0.45)
+                    i == 0 ? p.move(to: q) : p.addLine(to: q)
+                }
+                p.closeSubpath()
+                ctx.fill(p, with: .color(color))
+            }
+        }
+    }
+}
+
+/// While Spotify plays, the record sheen turns and a few notes drift up from the player. The tonearm stays put.
+private struct RecordSpin: View {
+    @EnvironmentObject var model: AppModel
+    let image: NSImage?
+    let props: Props
+
+    private var spinning: Bool { model.spotify.playing && !calmMotion }
+
+    var body: some View {
+        if spinning, let image {
+            ZStack(alignment: .topLeading) {
+                TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+                    Canvas { ctx, size in
+                        draw(in: &ctx, time: context.date.timeIntervalSinceReferenceDate)
+                    }
+                }
+                // Put the arm back on top of the sheen.
+                Image(nsImage: image).resizable().frame(width: W, height: H)
+                    .mask { OutlineShape(groups: [props.tonearm], smooth: false).fill(Color.black).frame(width: W, height: H) }
+                TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+                    Notes(time: context.date.timeIntervalSinceReferenceDate)
+                }
+            }
+            .frame(width: W, height: H)
+            .transition(.opacity)
+        }
+    }
+
+    /// A point on the disc plane (unit coordinates) projected onto an ellipse in art space, then to scene points.
+    private func project(_ e: (center: CGPoint, a: CGFloat, b: CGFloat, tilt: CGFloat), _ radius: CGFloat, _ angle: Double) -> CGPoint {
+        let x = e.a * radius * CGFloat(cos(angle)), y = e.b * radius * CGFloat(sin(angle))
+        let t = e.tilt * .pi / 180
+        return P(e.center.x + x * cos(t) - y * sin(t), e.center.y + x * sin(t) + y * cos(t))
+    }
+
+    private func draw(in ctx: inout GraphicsContext, time: Double) {
+        let angle = time * 2 * .pi * 0.55 // 33 rpm
+        ctx.addFilter(.blur(radius: 1.2))
+        // Two soft light wedges across the grooves.
+        for (offset, width, strength) in [(0.0, 0.75, 0.5), (.pi * 0.95, 0.45, 0.32)] {
+            var wedge = Path()
+            let a0 = angle + offset, a1 = a0 + width
+            wedge.move(to: project(props.vinyl, 0.4, a0))
+            for k in 0...10 { wedge.addLine(to: project(props.vinyl, 0.97, a0 + (a1 - a0) * Double(k) / 10)) }
+            wedge.addLine(to: project(props.vinyl, 0.4, a1))
+            wedge.closeSubpath()
+            ctx.fill(wedge, with: .color(Color(red: 0.85, green: 0.9, blue: 1).opacity(strength)))
+        }
+        // A scuff on the label, to see the turning.
+        var tick = Path()
+        tick.move(to: project(props.label, 0.55, angle * 1.0 + 1.2))
+        tick.addLine(to: project(props.label, 0.9, angle * 1.0 + 1.2))
+        ctx.stroke(tick, with: .color(Ink.pencil.opacity(0.85)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+    }
+
+    private struct Notes: View {
+        let time: Double
+
+        var body: some View {
+            ZStack(alignment: .topLeading) {
+                ForEach(0..<3, id: \.self) { i in
+                    let phase = (time * 0.2 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
+                    let base = P(130, 620)
+                    Image(systemName: i == 1 ? "music.quarternote.3" : "music.note")
+                        .font(.system(size: 11 + CGFloat(i) * 1.5, weight: .bold))
+                        .foregroundStyle(Ink.pencil)
+                        .shadow(color: .white.opacity(0.7), radius: 1.5)
+                        .opacity(calmMotion ? 0.8 : sin(phase * .pi) * 0.9)
+                        .position(x: base.x + CGFloat(phase) * 30 + CGFloat(sin(phase * 9 + Double(i) * 2)) * 4 + CGFloat(i) * 16,
+                                  y: base.y - CGFloat(phase) * 70 - CGFloat(i) * 6)
+                }
+            }
+            .frame(width: W, height: H, alignment: .topLeading)
         }
     }
 }

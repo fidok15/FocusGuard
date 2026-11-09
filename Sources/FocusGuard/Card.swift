@@ -5,24 +5,20 @@ import SwiftUI
 struct SessionCard: View {
     @EnvironmentObject var model: AppModel
 
-    private static let left: CGFloat = 128
-    private static let bottom: CGFloat = 220
     private static let tail: CGFloat = 8
-    private static let tailX: CGFloat = 40 // local x of the tail tip, centred on the timer dial
 
     private static func size(_ key: String) -> CGSize {
         switch key {
-        case "idle": return CGSize(width: 164, height: 62)
-        case "confirm": return CGSize(width: 184, height: 72)
-        case "setup": return CGSize(width: 184, height: 128)
-        default: return CGSize(width: 184, height: 114)
+        case "idle": return CGSize(width: 196, height: 108)
+        case "why": return CGSize(width: 196, height: 142)
+        default: return CGSize(width: 196, height: 116)
         }
     }
 
     var body: some View {
         let key = model.cardKey
         let size = Self.size(key)
-        let shape = TornCard(tailX: Self.tailX, tail: Self.tail)
+        let shape = TornCard(tailX: size.width / 2, tail: Self.tail)
         ZStack {
             CardContent(key: key)
                 .padding(.horizontal, 13).padding(.top, 13).padding(.bottom, 6)
@@ -35,16 +31,22 @@ struct SessionCard: View {
                 }
                 .overlay(shape.stroke(Ink.pencil.opacity(0.45), style: StrokeStyle(lineWidth: 0.7, lineCap: .round, lineJoin: .round)))
                 .overlay(alignment: .topLeading) {
-                    WashiTape(width: 34, height: 11).rotationEffect(.degrees(-5)).offset(x: size.width - 48, y: -2)
+                    if key != "why" { // the camera explanation must be read, so it cannot be put away
+                        // The tape holding the card: its × takes the card down; the session keeps running.
+                        TapeX(width: 44, height: 15, help: "Hide the card (click the clock to bring it back)") { model.cardHidden = true }
+                            .offset(x: size.width - 33, y: -5)
+                    } else {
+                        WashiTape(width: 34, height: 11).rotationEffect(.degrees(-5)).offset(x: size.width - 48, y: -2)
+                    }
                 }
                 .padding(.bottom, Self.tail)
                 .frame(width: size.width, height: size.height + Self.tail, alignment: .top)
-                .rotationEffect(.degrees(-1.5), anchor: .bottomLeading)
-                .transition(.opacity.combined(with: .offset(y: 6)))
+                .rotationEffect(.degrees(-1.5), anchor: .bottom) // the tail keeps pointing at the clock
+                .transition(.opacity.combined(with: .offset(y: 6)).combined(with: .scale(scale: 0.95, anchor: .bottom)))
                 .id(key)
         }
         .frame(width: W, height: H, alignment: .topLeading)
-        .offset(x: Self.left, y: Self.bottom - size.height)
+        .offset(x: Spots.clockTop.x - size.width / 2 - 12, y: Spots.clockTop.y - Self.tail - size.height)
     }
 }
 
@@ -103,66 +105,123 @@ private struct CardContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch key {
-            case "confirm":
-                RuledRow(height: 20) { Text("stop session?").font(Ink.hand(13)) }
-                RuledRow(height: 20, seed: 1) {
-                    HStack(spacing: 18) {
-                        BoxChoice(title: "yes", action: model.stop)
-                        BoxChoice(title: "no") { model.confirmStop = false }
-                    }
-                }
             case "study":
                 if case .study(let round) = model.clock.phase {
-                    RuledRow(height: 15) { Text("study \(round) of \(model.clock.config.rounds)").font(Ink.hand(11)) }
+                    PhaseHeader(title: "study \(round) of \(model.clock.config.rounds)")
                 }
                 RuledRow(height: 31, seed: 1) {
                     HStack(alignment: .lastTextBaseline) {
-                        Num(text: model.remainingText)
+                        Num(text: model.remainingText, color: model.clock.isPaused ? Ink.ballpoint.opacity(0.5) : Ink.ballpoint)
                         Spacer(minLength: 4)
-                        Text("focus").font(Ink.hand(10))
-                        Num(text: "\(Int(model.focus.rounded()))%", color: model.focus < 50 ? Ink.red : Ink.ballpoint)
+                        if model.showsFocus {
+                            Text("focus").font(Ink.hand(11))
+                            Num(text: "\(Int(model.focus.rounded()))%", color: model.focus < 50 ? Ink.red : Ink.ballpoint)
+                        }
                     }
                 }
-                RuledRow(height: 22, seed: 2) { Sparkline(values: model.history.suffix(40) + [model.focus]).frame(height: 16) }
-                RuledRow(height: 16, seed: 3) { StatusLine() }
+                RuledRow(height: 22, seed: 2) {
+                    if model.showsFocus { Sparkline(values: model.history.suffix(40) + [model.focus]).frame(height: 16) }
+                }
+                RuledRow(height: 18, seed: 3) {
+                    if let nudge = model.nudgeText {
+                        Text(verbatim: nudge).font(Ink.hand(11)).foregroundStyle(Ink.red).lineLimit(1).minimumScaleFactor(0.75)
+                    } else {
+                        StatusLine()
+                    }
+                }
             case "rest":
                 if case .rest(let round) = model.clock.phase {
-                    RuledRow(height: 15) { Text("break \(round) of \(model.clock.config.rounds)").font(Ink.hand(11)) }
+                    PhaseHeader(title: model.clock.isLongBreak ? "long break \(round) of \(model.clock.config.rounds)"
+                                                               : "break \(round) of \(model.clock.config.rounds)")
                 }
-                RuledRow(height: 34, seed: 1) { Num(text: model.remainingText, color: Ink.ballpoint) }
+                RuledRow(height: 34, seed: 1) { Num(text: model.remainingText, color: Ink.ballpoint.opacity(model.clock.isPaused ? 0.5 : 1)) }
                 RuledRow(height: 20, seed: 2) {
-                    Text(model.clock.isPaused ? "paused, tap the mug" : "stretch, drink some water").font(Ink.hand(11))
+                    Text(model.clock.isPaused ? pausedLine : String(localized: "stretch, drink some water")).font(Ink.hand(12))
                 }
-                RuledRow(height: 18, seed: 3) { Text("camera is off").font(Ink.hand(10)).opacity(0.75) }
-            case "setup":
-                StepRow(label: "study", value: $model.config.studyMinutes, range: 5...90, step: 5, unit: "min", seed: 0)
-                StepRow(label: "break", value: $model.config.breakMinutes, range: 1...30, step: 1, unit: "min", seed: 1)
-                StepRow(label: "rounds", value: $model.config.rounds, range: 1...8, step: 1, unit: "×", seed: 2)
-                RuledRow(height: 26, seed: 3) { WordLink(title: "start", size: 13, underlined: true, action: model.start) }
-                RuledRow(height: 18, seed: 4) { Text("camera only while studying").font(Ink.hand(10)).lineLimit(1).minimumScaleFactor(0.8) }
+                RuledRow(height: 18, seed: 3) { Text("camera is off").font(Ink.hand(11)).opacity(0.75) }
+            case "why":
+                RuledRow(height: 18) { Text("about the camera").font(Ink.hand(12)) }
+                Text("FocusGuard looks at you through the camera only while you study. Nothing is saved or sent anywhere.")
+                    .font(Ink.hand(12)).lineSpacing(1).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading).padding(.top, 5)
+                RuledRow(height: 26, seed: 2) {
+                    HStack {
+                        WordLink(title: "okay, start", size: 12, underlined: true, action: model.confirmCameraWhy)
+                        Spacer(minLength: 4)
+                        WordLink(title: "timer only", size: 11, action: model.startWithoutCamera)
+                    }
+                }
             case "done":
                 RuledRow(height: 18) {
                     HStack(alignment: .lastTextBaseline) {
                         Text("done!").font(Ink.hand(13))
                         Spacer(minLength: 4)
-                        Text("nudges: \(model.nudges)").font(Ink.hand(10))
+                        if !model.history.isEmpty { Text("nudges: \(model.nudges)").font(Ink.hand(11)) }
                     }
                 }
                 RuledRow(height: 31, seed: 1) {
                     HStack(alignment: .lastTextBaseline) {
-                        Text("average focus").font(Ink.hand(10))
+                        Text("studied").font(Ink.hand(11))
                         Spacer(minLength: 4)
-                        Num(text: "\(model.averageFocus)%")
+                        Num(text: "\(model.studiedMinutes) min")
                     }
                 }
-                RuledRow(height: 22, seed: 2) { Sparkline(values: model.history).frame(height: 16) }
-                RuledRow(height: 18, seed: 3) { WordLink(title: "new session", size: 11, underlined: true, action: model.timerTapped) }
-            default:
-                RuledRow(height: 20) { Text("tap the timer").font(Ink.hand(11)) }
-                RuledRow(height: 20, seed: 1) { Text("to start studying").font(Ink.hand(11)) }
+                RuledRow(height: 22, seed: 2) {
+                    if let average = model.averageFocus {
+                        HStack(alignment: .lastTextBaseline) {
+                            Text("average focus").font(Ink.hand(11))
+                            Spacer(minLength: 4)
+                            Sparkline(values: model.history).frame(width: 60, height: 16)
+                            Num(text: "\(average)%", size: 16)
+                        }
+                    } else {
+                        Text("\(model.clock.config.rounds) rounds").font(Ink.hand(12))
+                    }
+                }
+                RuledRow(height: 18, seed: 3) {
+                    HStack {
+                        WordLink(title: "adjust", size: 12, action: model.stop) // back to the idle card and its settings
+                        Spacer(minLength: 4)
+                        WordLink(title: "new session", size: 12, underlined: true, action: model.requestStart)
+                    }
+                }
+            default: // idle: the session's settings right on the card, and start
+                StepRow(label: "study", value: $model.config.studyMinutes, range: 5...90, step: 5, unit: "min", seed: 0)
+                StepRow(label: "break", value: $model.config.breakMinutes, range: 1...30, step: 1, unit: "min", seed: 1)
+                StepRow(label: "rounds", value: $model.config.rounds, range: 1...8, step: 1, unit: "×", seed: 2)
+                RuledRow(height: 26, seed: 3) {
+                    HStack(alignment: .lastTextBaseline) {
+                        WordLink(title: "start", size: 13, underlined: true, action: model.requestStart)
+                        Spacer(minLength: 4)
+                        if !model.seenHint { Text("or click the clock").font(Ink.hand(11)).opacity(0.75) }
+                    }
+                }
             }
         }
         .foregroundStyle(Ink.pencil)
+    }
+
+    private var pausedLine: String {
+        model.pausedBySleep ? String(localized: "paused while you were away") : String(localized: "paused, space to resume")
+    }
+}
+
+/// "study 2 of 4" with pause / resume and stop on the right. Paused shows in the greyed time and the line below.
+private struct PhaseHeader: View {
+    @EnvironmentObject var model: AppModel
+    let title: LocalizedStringKey
+
+    var body: some View {
+        RuledRow(height: 17) {
+            HStack(spacing: 0) {
+                Text(title)
+                Spacer(minLength: 4)
+                WordLink(title: model.clock.isPaused ? "resume" : "pause", size: 12, action: model.togglePause)
+                WordLink(title: "stop", size: 12, action: model.stop).padding(.leading, 9)
+            }
+            .padding(.trailing, 14) // clear of the tape on the corner
+            .font(Ink.hand(12))
+        }
     }
 }
 
@@ -172,21 +231,24 @@ private struct StatusLine: View {
     var body: some View {
         Group {
             if model.clock.isPaused {
-                Text("paused, tap the mug")
+                Text(model.pausedBySleep ? "paused while you were away" : "paused, space to resume")
+            } else if model.timerOnly {
+                Text("timer only, no camera")
             } else {
                 switch model.camera {
-                case .denied: WordLink(title: "allow camera access", size: 10, action: model.openCameraSettings)
+                case .denied: WordLink(title: "timer only, allow camera?", size: 11, action: model.openCameraSettings)
                 case .unavailable: Text("camera unavailable, retrying…")
                 case .starting: Text("starting camera…")
-                case .running where model.calibrating: Text("calibrating, look at the screen…")
+                case .running where model.calibrating: Text("calibrating, look ahead…")
+                case .running where model.focusStale: Text("can't see your eyes clearly")
                 case .running, .off: Text("camera on, stays on this Mac")
                 }
             }
         }
-        .font(Ink.hand(10))
+        .font(Ink.hand(11))
         .foregroundStyle(Ink.pencil)
         .lineLimit(1)
-        .minimumScaleFactor(0.8)
+        .minimumScaleFactor(0.9)
     }
 }
 
@@ -201,19 +263,22 @@ private struct StepRow: View {
     var body: some View {
         RuledRow(height: 20, seed: seed) {
             HStack(spacing: 0) {
-                Text(label).font(Ink.hand(11)).foregroundStyle(Ink.pencil)
+                Text(label).font(Ink.hand(12)).foregroundStyle(Ink.pencil)
                 Spacer(minLength: 4)
                 PencilTap(glyph: "−") { value = max(range.lowerBound, value - step) }
+                    .accessibilityLabel(Text("less \(Text(label))"))
                 ZStack {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text(verbatim: "\(value)").font(Ink.hand(13)).monospacedDigit()
-                        Text(unit).font(Ink.hand(10))
+                        Text(unit).font(Ink.hand(11))
                     }
                     .foregroundStyle(Ink.pencil)
                     LooseEllipse(seed: seed).stroke(Ink.pencil.opacity(0.7), lineWidth: 0.9).padding(.vertical, 1)
                 }
                 .frame(width: 44, height: 20)
+                .accessibilityElement(children: .combine)
                 PencilTap(glyph: "+") { value = min(range.upperBound, value + step) }
+                    .accessibilityLabel(Text("more \(Text(label))"))
             }
         }
     }
@@ -245,5 +310,8 @@ struct Sparkline: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)), with: .color(low ? Ink.red : Ink.pencil))
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel(Text("focus history"))
+        .accessibilityValue(values.last.map { Text(verbatim: "\(Int($0)) %") } ?? Text(verbatim: ""))
     }
 }

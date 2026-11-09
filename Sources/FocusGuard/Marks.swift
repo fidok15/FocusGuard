@@ -110,7 +110,7 @@ struct Num: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Text(verbatim: text).opacity(0.25).offset(x: 0.4, y: 0.4)
+            Text(verbatim: text).opacity(0.25).offset(x: 0.4, y: 0.4).accessibilityHidden(true)
             Text(verbatim: text)
         }
         .font(Ink.num(size))
@@ -145,6 +145,43 @@ struct PressStyle: ButtonStyle {
     }
 }
 
+/// Keyboard focus for the hand-drawn controls: Tab moves between them, Return or space activates, and the focused one gets a pencil box
+/// (only once Tab was used, so mouse users never see it).
+private struct PencilFocus: ViewModifier {
+    let action: () -> Void
+
+    /// Lives inside the focusable view, so `isFocused` reflects it.
+    private struct Ring: View {
+        @Environment(\.isFocused) private var focused
+        @EnvironmentObject var model: AppModel
+
+        var body: some View {
+            Group {
+                if focused && model.usingKeyboard {
+                    DoodleBox().stroke(Ink.pencil.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                        .padding(-2).allowsHitTesting(false)
+                }
+            }
+            .onChange(of: focused) { model.focusedControls += $1 ? 1 : -1 }
+            .onDisappear { if focused { model.focusedControls -= 1 } } // the card went away with the focused control
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .focusable(false) // a Button is focusable by itself with Full Keyboard Access: one Tab stop per control, not two
+            .overlay { Ring() }
+            .focusable()
+            .focusEffectDisabled()
+            .onKeyPress(.return) { action(); return .handled }
+            .onKeyPress(.space) { action(); return .handled }
+    }
+}
+
+extension View {
+    func pencilFocus(_ action: @escaping () -> Void) -> some View { modifier(PencilFocus(action: action)) }
+}
+
 /// A − or + written in pencil; a scribble underlines it on hover.
 struct PencilTap: View {
     let glyph: String
@@ -159,9 +196,11 @@ struct PencilTap: View {
                     Scribble().trim(from: 0, to: hover.value ? 1 : 0)
                         .stroke(Ink.pencil.opacity(0.75), lineWidth: 0.9).frame(width: 9, height: 2.5).offset(y: 1)
                 }
+                .padding(.horizontal, 4).padding(.vertical, 2) // a 21 × 21 target around the small glyph
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.18), value: hover.value)
     }
@@ -187,6 +226,7 @@ struct WordLink: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.25), value: hover.value)
     }
@@ -215,6 +255,9 @@ struct BoxChoice: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .pencilFocus(action)
+        .accessibilityAddTraits(checked == true ? .isSelected : [])
+        .accessibilityValue(checked.map { $0 ? Text("on") : Text("off") } ?? Text(verbatim: ""))
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.2), value: hover.value)
         .animation(.easeOut(duration: 0.2), value: checked)

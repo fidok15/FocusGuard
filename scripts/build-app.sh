@@ -12,9 +12,9 @@ cp "$(swift build -c release --show-bin-path)/FocusGuard" "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/"
 cp Resources/AppIcon.icns "$app/Contents/Resources/"
 cp -R Resources/en.lproj Resources/pl.lproj "$app/Contents/Resources/"
+# The scenes are already 2000 px wide RGBA PNGs (transparent cut-out), so they ship as they are.
 for scene in morning day sunset night; do
-    # 1600 px wide is plenty for a 720 pt window on Retina.
-    sips -Z 1600 -s format jpeg -s formatOptions 85 "art/scene_$scene.jpeg" --out "$app/Contents/Resources/scene_$scene.jpg" >/dev/null
+    cp "art/scene_$scene.png" "$app/Contents/Resources/"
 done
 
 codesign --force --sign - "$app"

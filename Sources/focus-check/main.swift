@@ -88,6 +88,36 @@ func sessionRunsStudyBreakCyclesToDone() {
     check(clock.phase == .done)
 }
 
+func everyFourthBreakIsLong() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 8), at: t0)
+    check(clock.breakMinutes(after: 3) == 5 && clock.breakMinutes(after: 4) == 15 && clock.breakMinutes(after: 8) == 15)
+    clock.tick(at: t0 + (25 + 5 + 25 + 5 + 25 + 5 + 25) * 60)
+    check(clock.phase == .rest(round: 4) && clock.isLongBreak && clock.phaseDuration == 15 * 60)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 20, rounds: 8), at: t0)
+    check(clock.breakMinutes(after: 4) == 30)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 30, rounds: 8), at: t0)
+    check(clock.breakMinutes(after: 4) == 30)
+}
+
+func absenceRespectsCooldown() {
+    // Present, gone 25 s, back for 5 s, gone again for 25 s: the second absence is inside the 180 s cooldown.
+    check(run(until: 120) { t in (10..<35).contains(t) || (40..<65).contains(t) ? .noFace : look } == [.absent])
+}
+
+func absentIsNotCountedBeforeFirstFace() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    for i in 0...600 { check(scorer.process(.noFace, at: Double(i) / fps) == nil) } // 60 s at an empty chair
+    check(scorer.score == 100)
+    var events: [FocusEvent] = []
+    for i in 601...1100 { // then a face, then 20 s gone
+        let t = Double(i) / fps
+        if let e = scorer.process(i < 700 ? look : .noFace, at: t) { events.append(e) }
+    }
+    check(events == [.absent])
+}
+
 func sessionSkipsPhasesMissedDuringSleep() {
     var clock = SessionClock()
     let t0 = Date(timeIntervalSinceReferenceDate: 0)
@@ -182,7 +212,65 @@ func zeroConfigIsClamped() {
     check(clock.phase == .done)
 }
 
+func lcdDigitsAndText() {
+    check(SevenSegment.mask(8) == 0b1111111)
+    check(SevenSegment.mask(1) == 0b0000110)
+    check(SevenSegment.mask(7) == 0b0000111)
+    check(ClockText.countdown(24 * 60 + 59.2) == [2, 5, 0, 0])
+    check(ClockText.countdown(24 * 60 + 58.5) == [2, 4, 5, 9])
+    check(ClockText.countdown(0.2) == [0, 0, 0, 1])
+    check(ClockText.countdown(0) == [0, 0, 0, 0])
+    check(ClockText.countdown(-5) == [0, 0, 0, 0])
+    check(ClockText.countdown(90 * 60) == [9, 0, 0, 0])
+    check(ClockText.countdown(10_000_000) == [9, 9, 5, 9])
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC")!
+    check(ClockText.wall(Date(timeIntervalSince1970: 3600 * 7 + 60 * 5), calendar: cal) == [0, 7, 0, 5])
+}
+
+func phaseAnnouncements() {
+    check(Phase.study(round: 1).announcement(to: .rest(round: 1)) == .breakStarted)
+    check(Phase.rest(round: 1).announcement(to: .study(round: 2)) == .backToWork)
+    check(Phase.study(round: 4).announcement(to: .done) == .allDone)
+    check(Phase.idle.announcement(to: .study(round: 1)) == nil)
+    check(Phase.study(round: 1).announcement(to: .idle) == nil)
+}
+
+/// Unusable frames between two distractions must not let the first one's hold carry over.
+func lowConfidenceStretchResetsHold() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    var blurry = look; blurry.confidence = 0.1
+    var first: Double?
+    for i in 0...Int(200 * fps) {
+        let t = Double(i) / fps
+        let s = (100..<120).contains(t) || t >= 130 ? away : (120..<130).contains(t) ? blurry : look
+        if scorer.process(s, at: t) != nil, first == nil { first = t }
+    }
+    check((first ?? 0) >= 139)
+}
+
+func spotifyReplyParses() {
+    let d = String(NowPlaying.separator)
+    let n = NowPlaying.parse(["playing", "Blue", "Joni Mitchell", "Blue", "https://i.scdn.co/image/ab67", "true", "false"].joined(separator: d))
+    check(n == NowPlaying(playing: true, title: "Blue", artist: "Joni Mitchell", album: "Blue",
+                          artworkURL: URL(string: "https://i.scdn.co/image/ab67"), shuffling: true, repeating: false))
+    check(NowPlaying.parse("stopped") == nil) // nothing loaded
+    check(NowPlaying.oembedThumbnail(Data(#"{"thumbnail_url":"https://image-cdn-ak.spotifycdn.com/image/ab67"}"#.utf8))
+          == URL(string: "https://image-cdn-ak.spotifycdn.com/image/ab67"))
+    check(NowPlaying.oembedThumbnail(Data(#"{"thumbnail_url":"https://evil.example/x.jpg"}"#.utf8)) == nil)
+    check(NowPlaying.parse(["paused", "A", "B", "C", "file:///etc/passwd", "false", "true"].joined(separator: d))?.artworkURL == nil)
+    check(NowPlaying.parse(["paused", "A", "B", "C", "https://evil.example/x.jpg", "false", "true"].joined(separator: d))?.artworkURL == nil)
+}
+
+func monoNeverGoesBack() {
+    let a = Mono.seconds(), b = Mono.seconds()
+    check(b >= a && a > 0)
+}
+
 let checks: [(String, () -> Void)] = [
+    ("spotifyReplyParses", spotifyReplyParses),
+    ("monoNeverGoesBack", monoNeverGoesBack),
+    ("lowConfidenceStretchResetsHold", lowConfidenceStretchResetsHold),
     ("noInstantAlertAfterFrameGap", noInstantAlertAfterFrameGap),
     ("delayedCalibrationStillWorks", delayedCalibrationStillWorks),
     ("calibrationUsesMedian", calibrationUsesMedian),
@@ -204,6 +292,11 @@ let checks: [(String, () -> Void)] = [
     ("sessionRunsStudyBreakCyclesToDone", sessionRunsStudyBreakCyclesToDone),
     ("sessionSkipsPhasesMissedDuringSleep", sessionSkipsPhasesMissedDuringSleep),
     ("pauseFreezesRemainingTime", pauseFreezesRemainingTime),
+    ("lcdDigitsAndText", lcdDigitsAndText),
+    ("phaseAnnouncements", phaseAnnouncements),
+    ("everyFourthBreakIsLong", everyFourthBreakIsLong),
+    ("absenceRespectsCooldown", absenceRespectsCooldown),
+    ("absentIsNotCountedBeforeFirstFace", absentIsNotCountedBeforeFirstFace),
 ]
 for (name, body) in checks {
     current = name

@@ -5,6 +5,8 @@ import SwiftUI
 @MainActor
 enum Bubble {
     private static var panel: NSPanel?
+    /// Screen frame of our status item, set by the panel controller.
+    static var anchorFrame: () -> NSRect? = { nil }
 
     static func show(_ text: String, cat: NSImage?) {
         panel?.orderOut(nil)
@@ -17,7 +19,7 @@ enum Bubble {
         p.hasShadow = false
         p.level = .statusBar
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        p.contentView = NSHostingView(rootView: BubbleView(text: text, cat: cat) { hide(p) })
+        p.contentView = NSHostingView(rootView: BubbleView(text: text, cat: cat) { [weak p] in if let p { hide(p) } }) // weak: the panel owns this view
         // Enter: fade in while dropping 8 pt from under the menu bar.
         let target = origin(for: size)
         p.setFrameOrigin(CGPoint(x: target.x, y: target.y + 8))
@@ -43,9 +45,9 @@ enum Bubble {
 
     /// Below our status item; falls back to the top-right corner of the main screen.
     private static func origin(for size: CGSize) -> CGPoint {
-        let itemWindow = NSApp.windows.first { $0.className == "NSStatusBarWindow" }
-        let item = itemWindow?.frame
-        let screen = (itemWindow?.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let item = anchorFrame()
+        let screen = NSScreen.screens.first { screen in item.map { screen.frame.contains($0.origin) } ?? false }?.visibleFrame
+            ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let x = (item?.midX ?? screen.maxX - size.width / 2 - 12) - 34
         return CGPoint(x: min(max(x, screen.minX + 8), screen.maxX - size.width - 8),
                        y: (item?.minY ?? screen.maxY) - size.height - 2)

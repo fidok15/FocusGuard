@@ -91,10 +91,13 @@ public final class FocusScorer {
     private var baseline: (yaw: Double, pitch: Double, ear: Double)?
     private var closedSince: Double?
     private var absentSince: Double?
+    /// Nobody counts as absent before the first face of this stretch: coming back late from a break is not a lapse.
+    private var faceSeen = false
     private var absentAlerted = false
     private var belowSince: Double?
     private var lastAlert: Double?
-    private var lastFrame: Double?
+    /// Time of the last frame that counted (not skipped); the app hides the focus figure once this goes stale.
+    public private(set) var lastFrame: Double?
 
     public init(params: ScorerParams, start: Double) {
         self.params = params
@@ -109,10 +112,9 @@ public final class FocusScorer {
             closedSince = nil
             absentSince = nil
         }
-        lastFrame = t
-
         let state = classify(signals, at: t)
         guard state != .skipped else { return nil }
+        lastFrame = t // only frames that count: a long run of skipped ones is a gap too
 
         samples.append((t, state == .focused))
         while let first = samples.first, first.t < t - params.window { samples.removeFirst() }
@@ -124,10 +126,12 @@ public final class FocusScorer {
 
     public func classify(_ s: FaceSignals, at t: Double) -> FrameState {
         guard s.faceFound else {
+            guard faceSeen else { return .skipped }
             if absentSince == nil { absentSince = t }
             closedSince = nil
             return .absent
         }
+        faceSeen = true
         if absentSince != nil {
             // Back at the desk: the windowed score still lags, so don't let it count as an already-held drop.
             absentSince = nil
@@ -171,6 +175,7 @@ public final class FocusScorer {
 
         if let since = absentSince {
             guard !absentAlerted, t - since >= Knobs.absentAlertAfter else { return nil }
+            if let lastAlert, t - lastAlert < params.cooldown { return nil } // stepping in and out of frame must not nag
             absentAlerted = true
             // Shares the cooldown on purpose: coming back to a low score must not pop a second bubble right away.
             lastAlert = t
