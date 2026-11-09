@@ -31,7 +31,7 @@ struct SessionCard: View {
                 }
                 .overlay(shape.stroke(Ink.pencil.opacity(0.45), style: StrokeStyle(lineWidth: 0.7, lineCap: .round, lineJoin: .round)))
                 .overlay(alignment: .topLeading) {
-                    if key == "study" || key == "rest" {
+                    if key != "why" { // the camera explanation must be read, so it cannot be put away
                         // The tape holding the card: its × takes the card down; the session keeps running.
                         TapeX(width: 44, height: 15, help: "Hide the card (click the clock to bring it back)") { model.cardHidden = true }
                             .offset(x: size.width - 33, y: -5)

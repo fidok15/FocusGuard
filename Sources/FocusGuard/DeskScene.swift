@@ -201,7 +201,7 @@ struct DeskScene: View {
             Hotspot(groups: [tod.props.record], lit: lit("record"), help: "Spotify: now playing", action: model.toggleMusic)
 
             // A note takes the card's place; the card's × hides it until the clock is clicked.
-            if !model.showSettings && !model.showMusic && !(model.cardHidden && model.clock.phase.isRunning) { SessionCard() }
+            if !model.showSettings && !model.showMusic && !(model.cardHidden && model.cardKey != "why") { SessionCard() }
 
             if model.showPreview && model.camera == .running {
                 Polaroid(session: model.cameraService.session).place(Spots.polaroid)
