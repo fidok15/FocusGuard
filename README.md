@@ -1,5 +1,3 @@
-<img src="docs/screenshots/icon.png" width="96" align="right" alt="">
-
 # FocusGuard
 
 **A cozy lofi study timer that lives in your Mac's menu bar.**
