@@ -320,14 +320,10 @@ final class AppModel: ObservableObject {
 
     /// A subtle chime (if sounds are on) and a speech bubble from the cat.
     private func announce(_ a: Announcement) {
-        let text: String, sound: String
-        switch a {
-        case .breakStarted: (text, sound) = (String(localized: "Break time, stretch a bit~"), "Glass")
-        case .backToWork: (text, sound) = (String(localized: "Back to it, you've got this~"), "Pop")
-        case .allDone: (text, sound) = (String(localized: "All done, nice work! ♡"), "Glass")
-        }
+        let text = Lines.random(for: a)
+        let sound = a == .backToWork ? "Pop" : "Glass"
         if soundsOn { NSSound(named: sound)?.play() }
-        if !panelOpen { Bubble.show(text, cat: timeOfDay.art.catFace) } // the open panel's card already says it
+        Bubble.show(text, cat: timeOfDay.art.catFace) // a notification: shown over the open panel too
         Self.speak(text)
     }
 
@@ -412,17 +408,52 @@ final class AppModel: ObservableObject {
     }
 }
 
+/// What the cat says. Each kind has several lines, and the same line never comes twice in a row.
+@MainActor
 enum Lines {
+    private static var last: [String: String] = [:]
+
+    private static func pick(_ kind: String, _ lines: [String]) -> String {
+        let line = lines.filter { $0 != last[kind] }.randomElement() ?? lines[0]
+        last[kind] = line
+        return line
+    }
+
     static func random(for event: FocusEvent) -> String {
         switch event {
         case .absent:
-            return [String(localized: "Where did you go? The cat is waiting~"),
-                    String(localized: "Hello? Your notebook misses you!")].randomElement()!
+            return pick("absent", [String(localized: "Where did you go? The cat is waiting~"),
+                                   String(localized: "Hello? Your notebook misses you!"),
+                                   String(localized: "The chair is empty and the cat is worried~")])
         case .lowFocus:
-            return [String(localized: "Hey! Your focus is slipping~"),
-                    String(localized: "Psst… eyes back on the notebook!"),
-                    String(localized: "The cat believes in you. Focus up! ♡"),
-                    String(localized: "Deep breath, one more page~")].randomElement()!
+            return pick("lowFocus", [String(localized: "Hey! Your focus is slipping~"),
+                                     String(localized: "Psst… eyes back on the notebook!"),
+                                     String(localized: "The cat believes in you. Focus up! ♡"),
+                                     String(localized: "Deep breath, one more page~"),
+                                     String(localized: "Just this one thing, then the next~")])
+        }
+    }
+
+    static func random(for announcement: Announcement) -> String {
+        switch announcement {
+        case .breakStarted:
+            return pick("break", [String(localized: "Break time, stretch a bit~"),
+                                  String(localized: "Time for a break! Drink some water~"),
+                                  String(localized: "Nice work! Rest your eyes for a bit~"),
+                                  String(localized: "Break! Look out the window for a while~"),
+                                  String(localized: "Stand up, stretch, the cat does it too~"),
+                                  String(localized: "You earned this break ♡")])
+        case .backToWork:
+            return pick("back", [String(localized: "Back to it, you've got this~"),
+                                 String(localized: "Break's over, one more round~"),
+                                 String(localized: "Ready? The notebook is waiting~"),
+                                 String(localized: "Let's go, small steps count too~"),
+                                 String(localized: "Fresh round, fresh focus~")])
+        case .allDone:
+            return pick("done", [String(localized: "All done, nice work! ♡"),
+                                 String(localized: "Session done! The cat is proud of you~"),
+                                 String(localized: "That's a wrap, well studied! ♡"),
+                                 String(localized: "Done! Time for a proper rest~")])
         }
     }
 }

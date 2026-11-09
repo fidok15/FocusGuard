@@ -19,7 +19,12 @@ enum Bubble {
         p.hasShadow = false
         p.level = .statusBar
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        p.contentView = NSHostingView(rootView: BubbleView(text: text, cat: cat) { [weak p] in if let p { hide(p) } }) // weak: the panel owns this view
+        let view = NSHostingView(rootView: BubbleView(text: text, cat: cat) { [weak p] in if let p { hide(p) } } // weak: the panel owns this view
+            .frame(width: size.width, height: size.height))
+        // Without this the hosting view resizes the panel to the text's ideal height (574 pt here), which grows it
+        // upward off the top of the screen, and the bubble never shows.
+        view.sizingOptions = []
+        p.contentView = view
         // Enter: fade in while dropping 8 pt from under the menu bar.
         let target = origin(for: size)
         p.setFrameOrigin(CGPoint(x: target.x, y: target.y + 8))
