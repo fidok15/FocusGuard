@@ -63,7 +63,7 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 
 ## Install
 
-Requires **macOS 14 Sonoma or later**.
+Requires **macOS 14 Sonoma or later**, on Apple silicon or Intel.
 
 ### Download
 

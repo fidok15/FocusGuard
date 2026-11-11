@@ -3,12 +3,14 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-swift build -c release --product FocusGuard
+# One binary for Apple silicon and Intel Macs.
+arch="--arch arm64 --arch x86_64"
+swift build -c release --product FocusGuard $arch
 app=dist/FocusGuard.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
-cp "$(swift build -c release --show-bin-path)/FocusGuard" "$app/Contents/MacOS/"
+cp "$(swift build -c release $arch --show-bin-path)/FocusGuard" "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/"
 cp Resources/AppIcon.icns "$app/Contents/Resources/"
 cp -R Resources/en.lproj Resources/pl.lproj "$app/Contents/Resources/"
