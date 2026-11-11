@@ -114,7 +114,7 @@ The score is the share of focused frames in a sliding window. A nudge fires only
 
 The sensitivity slider moves the threshold. If you study from paper on your desk, looking down may count as looking away. In that case, lower the sensitivity.
 
-The approach follows [Driver-State-Detection](https://github.com/e-candeloro/Driver-State-Detection) by Ettore Candeloro (MIT). [The design spec](docs/superpowers/specs/2026-10-13-focusguard-design.md) has the exact numbers.
+The approach follows [Driver-State-Detection](https://github.com/e-candeloro/Driver-State-Detection) by Ettore Candeloro (MIT). [How FocusGuard scores focus](docs/focus-scoring.md) has the exact numbers.
 
 ## For developers
 
