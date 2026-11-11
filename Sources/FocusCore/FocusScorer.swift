@@ -72,6 +72,51 @@ public enum Knobs {
     public static let displaySmoothing = 0.05
     /// Baseline needs this many good frames (~3 s at 10 fps) after the calibration time.
     public static let calibrationSamples = 30
+    /// A head pose you held for this long in total over the last `zoneMemory` seconds becomes a work zone (a second screen).
+    public static let zoneLearnAfter = 60.0
+    public static let zoneMemory = 600.0
+    /// Poses further than this above or below the calibrated one are never learned: that is a phone in your lap, not a screen.
+    public static let zoneMaxPitch = 30.0
+}
+
+/// Head poses you keep coming back to: a second monitor, a laptop beside it. Lives across study phases, so a screen
+/// learned in round one is still a screen in round two. Poses go into 10° bins; a pose is in a zone when its bin and
+/// the bins around it (about ±15°) add up to `zoneLearnAfter` seconds within the last `zoneMemory` seconds.
+/// ponytail: frames are counted as 0.1 s each, true at the camera's fixed ~10 fps.
+public final class PoseZones {
+    private struct Bin: Hashable { let yaw: Int, pitch: Int }
+    private var samples: [(t: Double, bin: Bin)] = []
+    private var counts: [Bin: Int] = [:]
+
+    public init() {}
+
+    private static func bin(_ yaw: Double, _ pitch: Double) -> Bin {
+        Bin(yaw: Int((yaw / 10).rounded()), pitch: Int((pitch / 10).rounded()))
+    }
+
+    private func forget(before t: Double) {
+        var drop = 0
+        while drop < samples.count, samples[drop].t < t - Knobs.zoneMemory {
+            counts[samples[drop].bin]! -= 1
+            drop += 1
+        }
+        if drop > 0 { samples.removeFirst(drop) }
+    }
+
+    public func record(yaw: Double, pitch: Double, at t: Double) {
+        forget(before: t)
+        let b = Self.bin(yaw, pitch)
+        samples.append((t, b))
+        counts[b, default: 0] += 1
+    }
+
+    public func contains(yaw: Double, pitch: Double, at t: Double) -> Bool {
+        forget(before: t)
+        let b = Self.bin(yaw, pitch)
+        var frames = 0
+        for dy in -1...1 { for dp in -1...1 { frames += counts[Bin(yaw: b.yaw + dy, pitch: b.pitch + dp)] ?? 0 } }
+        return Double(frames) * 0.1 >= Knobs.zoneLearnAfter
+    }
 }
 
 /// Turns per-frame face signals into a windowed focus score and rare, non-spammy alerts.
@@ -88,7 +133,7 @@ public final class FocusScorer {
     private let start: Double
     private var samples: [(t: Double, focused: Bool)] = []
     private var calibration: [FaceSignals] = []
-    private var baseline: (yaw: Double, pitch: Double, ear: Double)?
+    private var baseline: (yaw: Double, pitch: Double, ear: Double, gaze: Double)?
     private var closedSince: Double?
     private var absentSince: Double?
     /// Nobody counts as absent before the first face of this stretch: coming back late from a break is not a lapse.
@@ -99,9 +144,12 @@ public final class FocusScorer {
     /// Time of the last frame that counted (not skipped); the app hides the focus figure once this goes stale.
     public private(set) var lastFrame: Double?
 
-    public init(params: ScorerParams, start: Double) {
+    private let zones: PoseZones
+
+    public init(params: ScorerParams, start: Double, zones: PoseZones = PoseZones()) {
         self.params = params
         self.start = start
+        self.zones = zones
     }
 
     @discardableResult
@@ -148,7 +196,8 @@ public final class FocusScorer {
             if t - start >= Knobs.calibrationSeconds, calibration.count >= Knobs.calibrationSamples {
                 // Median, so a glance away during calibration doesn't skew the baseline.
                 func median(_ values: [Double]) -> Double { values.sorted()[values.count / 2] }
-                baseline = (median(calibration.map(\.yaw)), median(calibration.map(\.pitch)), median(calibration.map(\.ear)))
+                baseline = (median(calibration.map(\.yaw)), median(calibration.map(\.pitch)), median(calibration.map(\.ear)),
+                            median(calibration.map(\.gazeOffset)))
                 calibration = []
             }
             return .focused
@@ -162,12 +211,13 @@ public final class FocusScorer {
             closedSince = nil
         }
 
-        if abs(s.yaw - base.yaw) > Knobs.maxYaw
-            || abs(s.pitch - base.pitch) > Knobs.maxPitch
-            || s.gazeOffset > Knobs.maxGazeOffset {
-            return .lookingAway
+        // Every pose that could be a screen is remembered, so a second monitor becomes a zone after a minute or so.
+        if abs(s.pitch - base.pitch) <= Knobs.zoneMaxPitch { zones.record(yaw: s.yaw, pitch: s.pitch, at: t) }
+        if abs(s.yaw - base.yaw) > Knobs.maxYaw || abs(s.pitch - base.pitch) > Knobs.maxPitch {
+            return zones.contains(yaw: s.yaw, pitch: s.pitch, at: t) ? .focused : .lookingAway
         }
-        return .focused
+        // Relative to calibration: a camera off to the side sees the eye at an angle, so the pupil never sits centred.
+        return s.gazeOffset - base.gaze > Knobs.maxGazeOffset ? .lookingAway : .focused
     }
 
     private func evaluate(at t: Double) -> FocusEvent? {
