@@ -102,7 +102,7 @@ To quit, press **⌘Q** while the desk is open, or right-click the menu bar icon
 Each camera frame is classified as one of four states:
 
 - **focused**
-- **looking away**: head turned or gaze off center. Each study phase starts with a 10-second calibration, and these are measured against it.
+- **looking away**: head turned or gaze off center. Each study phase starts with a 10-second calibration, and these are measured against it. Places you keep looking at, like a second monitor or a laptop beside it, become work zones after about a minute and then count as focused.
 - **eyes closed**: closed for longer than 0.5 s, so blinks don't count.
 - **absent**: no face in the frame.
 

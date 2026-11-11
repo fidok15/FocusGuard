@@ -19,9 +19,13 @@ Each frame gets exactly one of these states:
 
 - `absent`: no face found.
 - `eyesClosed`: EAR < 0.7 × baseline EAR, sustained for > 0.5 s. Ordinary blinks never count.
-- `lookingAway`: |Δyaw| > 25°, or |Δpitch| > 20°, or pupil offset within the eye > 0.35.
+- `lookingAway`: |Δyaw| > 25° or |Δpitch| > 20°, unless that head pose is a learned work zone (below); or, with the head in the calibrated pose, the pupil offset is more than 0.35 above its calibrated value. The offset is relative because a camera beside the screen sees the eye at an angle.
 - `focused`: otherwise.
 - Frames with low Vision confidence are skipped (neither focused nor distracted).
+
+## Work zones (several screens)
+
+The calibration only knows the screen you looked at during its first 10 s. Every head pose afterwards is recorded in 10° bins. A pose whose bin and neighbouring bins (about ±15°) add up to 60 s within the last 10 minutes becomes a work zone and counts as focused: a second monitor or a laptop beside it is learned after about a minute. Poses more than 30° above or below the calibrated one are never learned, so a phone in your lap always counts as looking away. Zones are kept for the whole app run, across study phases.
 
 ## Score
 - `focusScore` = percentage of `focused` frames within the sliding window W.

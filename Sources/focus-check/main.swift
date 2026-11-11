@@ -9,7 +9,8 @@ private func check(_ ok: Bool, line: Int = #line) {
 
 private let fps = 10.0
 private let look = FaceSignals(faceFound: true, ear: 0.3, gazeOffset: 0.1, yaw: 0, pitch: 0, confidence: 0.9)
-private var away: FaceSignals { var s = look; s.yaw = 45; return s }
+/// Head well down, like reading a phone in your lap: never learned as a screen, so it always counts as away.
+private var away: FaceSignals { var s = look; s.pitch = 45; return s }
 private var closed: FaceSignals { var s = look; s.ear = 0.1; return s }
 
 /// Feeds `signal(t)` at 10 fps from 0 to `until` seconds and collects events.
@@ -26,6 +27,45 @@ private func run(_ params: ScorerParams = .standard, until: Double, _ signal: (D
 /// Focused, except `away` between `from` and `from + length`.
 private func distraction(from: Double, length: Double) -> (Double) -> FaceSignals {
     { t in (from..<(from + length)).contains(t) ? away : look }
+}
+
+/// Looking at a laptop 40° to the side: away at first, then a learned work zone.
+private var laptop: FaceSignals { var s = look; s.yaw = 40; s.pitch = 12; return s }
+
+/// Feeds `signal` from `from` to `to` seconds at 10 fps.
+private func feed(_ scorer: FocusScorer, from: Double, to: Double, _ signal: FaceSignals) {
+    for i in 0..<Int((to - from) * fps) { scorer.process(signal, at: from + Double(i) / fps) }
+}
+
+func secondScreenBecomesAZone() {
+    let scorer = FocusScorer(params: .standard, start: 0)
+    feed(scorer, from: 0, to: 100, look)
+    check(scorer.classify(laptop, at: 100) == .lookingAway) // not learned yet
+    feed(scorer, from: 100, to: 300, laptop)
+    check(scorer.classify(laptop, at: 300) == .focused)
+    check(scorer.score == 100)
+    check(scorer.classify(away, at: 300) == .lookingAway) // the phone still counts as away
+}
+
+func zonesCarryOverToTheNextPhase() {
+    let zones = PoseZones()
+    let first = FocusScorer(params: .standard, start: 0, zones: zones)
+    feed(first, from: 0, to: 20, look)
+    feed(first, from: 20, to: 120, laptop)
+    let next = FocusScorer(params: .standard, start: 200, zones: zones)
+    feed(next, from: 200, to: 215, look) // calibration of the new phase
+    check(next.classify(laptop, at: 215) == .focused)
+}
+
+func gazeIsRelativeToCalibration() {
+    // A camera beside the screen sees the eye at an angle: the pupil sits off-centre even when you look straight ahead.
+    var side = look; side.gazeOffset = 0.4
+    let scorer = FocusScorer(params: .standard, start: 0)
+    feed(scorer, from: 0, to: 15, side)
+    var straight = side; straight.gazeOffset = 0.45
+    var sideways = side; sideways.gazeOffset = 0.9
+    check(scorer.classify(straight, at: 15) == .focused)
+    check(scorer.classify(sideways, at: 15) == .lookingAway)
 }
 
 func oneSecondDipNeverAlerts() {
@@ -280,6 +320,9 @@ let checks: [(String, () -> Void)] = [
     ("singleRoundGoesStraightToDone", singleRoundGoesStraightToDone),
     ("pauseAfterMissedPhaseCatchesUp", pauseAfterMissedPhaseCatchesUp),
     ("zeroConfigIsClamped", zeroConfigIsClamped),
+    ("secondScreenBecomesAZone", secondScreenBecomesAZone),
+    ("zonesCarryOverToTheNextPhase", zonesCarryOverToTheNextPhase),
+    ("gazeIsRelativeToCalibration", gazeIsRelativeToCalibration),
     ("oneSecondDipNeverAlerts", oneSecondDipNeverAlerts),
     ("twentySecondDistractionDoesNotAlert", twentySecondDistractionDoesNotAlert),
     ("thirtySecondDistractionAlertsOnce", thirtySecondDistractionAlertsOnce),

@@ -83,6 +83,8 @@ final class AppModel: ObservableObject {
 
     let cameraService = CameraService()
     let spotify = Spotify()
+    /// Screens learned from where you look; kept for the whole app run, across study phases.
+    private let zones = PoseZones()
     private var bag = Set<AnyCancellable>()
     /// Set by the panel controller: closes the panel (Esc).
     var closePanel: () -> Void = {}
@@ -340,7 +342,8 @@ final class AppModel: ObservableObject {
         alerting = false
         focusStale = false
         if clock.phase.isStudy && !clock.isPaused && !timerOnly {
-            scorer = FocusScorer(params: .forSensitivity(sensitivity), start: Mono.seconds()) // camera frames carry Mono time too
+            scorer = FocusScorer(params: .forSensitivity(sensitivity), start: Mono.seconds(), // camera frames carry Mono time too
+                                 zones: zones)
             focus = 100
             calibrating = true
             startCamera()
