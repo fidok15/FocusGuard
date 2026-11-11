@@ -136,11 +136,6 @@ swift scripts/make-icon.swift                            # regenerate Resources/
 
 Pushing a `v*` tag that matches the version in `Resources/Info.plist` builds the app in CI and publishes a GitHub release.
 
-## Credits
-
-- Illustrations were generated with Google Gemini from prompts written for this project.
-- Focus heuristics were inspired by [e-candeloro/Driver-State-Detection](https://github.com/e-candeloro/Driver-State-Detection) (MIT).
-
 ## License
 
 [MIT](LICENSE)
