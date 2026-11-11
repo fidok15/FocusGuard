@@ -55,7 +55,7 @@ public struct ScorerParams: Equatable, Sendable {
     }
 }
 
-/// Calibration knobs, ported from the ideas in e-candeloro/Driver-State-Detection (MIT).
+/// Calibration knobs.
 /// ponytail: fixed constants tuned for a laptop webcam; expose in settings if users report false alerts.
 public enum Knobs {
     public static let calibrationSeconds = 10.0

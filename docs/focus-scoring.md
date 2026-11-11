@@ -8,7 +8,7 @@ Each camera frame (about 10 per second) goes through Apple's Vision framework: `
 
 ## Why not an end-to-end "focus %" model
 
-End-to-end engagement models trained on DAiSEE reach about 60–73 % accuracy even in papers and generalize poorly. The established approach is pretrained face and landmark models plus transparent scoring, which is what [Driver-State-Detection](https://github.com/e-candeloro/Driver-State-Detection) (MIT) does and what FocusGuard follows.
+End-to-end engagement models trained on DAiSEE reach about 60–73 % accuracy even in papers and generalize poorly. The established approach is pretrained face and landmark models plus transparent scoring. FocusGuard follows that approach.
 
 ## Calibration
 The first 10 s of each study phase record the user's baseline: neutral `yaw`/`pitch` (camera may sit low or to the side) and baseline EAR. All later checks use deltas from the baseline.
