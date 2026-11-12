@@ -627,7 +627,7 @@ private struct RecordSpin: View {
     }
 
     private func draw(in ctx: inout GraphicsContext, time: Double) {
-        let angle = time * 2 * .pi * 0.55 // 33 rpm
+        let angle = time * 2 * .pi * 0.25 // a calm 15 rpm; a real 33 rpm looks hectic at this size
         ctx.addFilter(.blur(radius: 1.2))
         // Two soft light wedges across the grooves.
         for (offset, width, strength) in [(0.0, 0.75, 0.5), (.pi * 0.95, 0.45, 0.32)] {
