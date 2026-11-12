@@ -187,6 +187,11 @@ struct DeskScene: View {
             .id(tod)
             .transition(.opacity)
 
+            // A click on the room, away from the objects (they sit above this), puts the card away like its ×.
+            if !model.cardHidden && model.cardKey != "why" {
+                Color.black.opacity(0.001).frame(width: W, height: H).onTapGesture { model.cardHidden = true }
+            }
+
             CatLayer(art: tod.art, lit: lit("cat")).id(tod)
 
             RecordSpin(image: tod.art.image, props: tod.props).id(tod).allowsHitTesting(false)
