@@ -187,6 +187,11 @@ struct DeskScene: View {
             .id(tod)
             .transition(.opacity)
 
+            // A click on the room, away from the objects (they sit above this), puts the card away like its ×.
+            if !model.cardHidden && model.cardKey != "why" {
+                Color.black.opacity(0.001).frame(width: W, height: H).onTapGesture { model.cardHidden = true }
+            }
+
             CatLayer(art: tod.art, lit: lit("cat")).id(tod)
 
             RecordSpin(image: tod.art.image, props: tod.props).id(tod).allowsHitTesting(false)
@@ -627,7 +632,7 @@ private struct RecordSpin: View {
     }
 
     private func draw(in ctx: inout GraphicsContext, time: Double) {
-        let angle = time * 2 * .pi * 0.55 // 33 rpm
+        let angle = time * 2 * .pi * 0.25 // a calm 15 rpm; a real 33 rpm looks hectic at this size
         ctx.addFilter(.blur(radius: 1.2))
         // Two soft light wedges across the grooves.
         for (offset, width, strength) in [(0.0, 0.75, 0.5), (.pi * 0.95, 0.45, 0.32)] {
