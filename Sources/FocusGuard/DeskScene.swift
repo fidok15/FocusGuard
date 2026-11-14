@@ -246,7 +246,8 @@ struct DeskScene: View {
         .onChange(of: model.noteOpen) { hover(at: nil, tod) }
         .onDisappear { hover(at: nil, tod) }
         // The tooltip follows the object under the pointer (a per-hotspot .help would also go by frame).
-        .help(hovered.value.flatMap { name in targets(tod).first { $0.name == name }?.help } ?? "")
+        // The notebook explains itself, so it shows no tooltip.
+        .help(hovered.value.flatMap { name in name == "notebook" ? nil : targets(tod).first { $0.name == name }?.help } ?? "")
         .fixedSize()
         .coordinateSpace(name: "scene")
         .animation(.easeInOut(duration: 1.2), value: tod)
