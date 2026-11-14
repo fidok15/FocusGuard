@@ -34,6 +34,7 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
   | Mug | Pauses or resumes. |
   | Sticky notes on the wall | Open the settings. |
   | Record player | Opens Spotify's now-playing note. |
+  | Notebook | Opens today's task list. |
   | Cat | Pet it for hearts and a written *prrr~*. |
 
 - **Small, calm motion.** The cat breathes, the coffee steams, and the record spins while music plays. With **Reduce Motion** turned on, the decorative motion stops.
@@ -44,6 +45,11 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 - **A clean view when you want it.** Every card and note is held by washi tape with a pencil ×. Click the × to put the card away while the session keeps running. Click the clock to bring it back.
 - **Long breaks.** In a session with more than 4 rounds, the break after every 4th round is three times as long (at most 30 minutes).
 - **A summary at the end.** You see minutes studied, your average focus with a small chart, and how many nudges you got.
+
+### Today's tasks
+- **A to-do list on the notebook.** Click the open notebook to see today's tasks. Type a task and press Return to add the next one, up to 6.
+- **Tick, don't lose.** A ticked task fades and gets a pencil line through it. Click its box again to bring it back.
+- **Clear when you want.** **clear done** takes the ticked tasks off the page. Nothing clears by itself, and the list stays after you quit.
 
 ### Focus tracking (optional)
 - **Estimates focus from the camera.** During study phases, FocusGuard checks eye openness, gaze and head pose about 10 times a second. The card shows a focus percentage and a pencil-drawn chart.

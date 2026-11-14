@@ -158,12 +158,13 @@ struct DeskScene: View {
          ("sticky", OutlineShape(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false), "Settings"),
          ("mug", OutlineShape(groups: [tod.props.mug]), "Pause / resume"),
          ("clock", OutlineShape(groups: [tod.props.clock]), "Start, pause or resume a study session"),
+         ("notebook", OutlineShape(groups: [tod.props.notebook], smooth: false), "Today's tasks"),
          ("cat", OutlineShape(groups: [tod.art.silhouette]), "Pet the cat")]
     }
 
     private func hover(at point: CGPoint?, _ tod: TimeOfDay) {
         let frame = CGRect(x: 0, y: 0, width: W, height: H)
-        let notes = model.showSettings || model.showMusic // a note covers the room; its tap catcher takes the clicks
+        let notes = model.noteOpen // a note covers the room; its tap catcher takes the clicks
         let name = notes ? nil : point.flatMap { p in targets(tod).first { $0.shape.path(in: frame).contains(p) }?.name }
         guard name != hovered.value else { return }
         if hovered.value != nil { NSCursor.pop() }
@@ -198,6 +199,7 @@ struct DeskScene: View {
             Steam().place(Spots.steam).allowsHitTesting(false)
             ClockDisplay().allowsHitTesting(false)
 
+            Hotspot(groups: [tod.props.notebook], smooth: false, lit: lit("notebook"), help: "Today's tasks", action: model.toggleTodos)
             Hotspot(groups: [tod.props.clock], lit: lit("clock"), help: "Start, pause or resume a study session", action: model.clockTapped)
             Hotspot(groups: [tod.props.mug], lit: lit("mug"), help: "Pause / resume", action: model.togglePause)
             Hotspot(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, lit: lit("sticky"), help: "Settings") {
@@ -206,7 +208,7 @@ struct DeskScene: View {
             Hotspot(groups: [tod.props.record], lit: lit("record"), help: "Spotify: now playing", action: model.toggleMusic)
 
             // A note takes the card's place; the card's × hides it until the clock is clicked.
-            if !model.showSettings && !model.showMusic && !(model.cardHidden && model.cardKey != "why") { SessionCard() }
+            if !model.noteOpen && !(model.cardHidden && model.cardKey != "why") { SessionCard() }
 
             if model.showPreview && model.camera == .running {
                 Polaroid(session: model.cameraService.session).place(Spots.polaroid)
@@ -227,13 +229,21 @@ struct DeskScene: View {
                     .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
 
+            if model.showTodos {
+                Color.black.opacity(0.001).onTapGesture { model.showTodos = false }
+                TodoNote()
+                    .frame(height: 240, alignment: .bottom) // grows upward from the notebook
+                    .position(x: 372, y: 150)
+                    .transition(.scale(scale: 0.8, anchor: .bottom).combined(with: .opacity))
+            }
+
             CloseButton().position(x: 622, y: 52) // on the top-right corner of the room, above the notes' tap catchers
         }
         .frame(width: W, height: H)
         .onContinuousHover(coordinateSpace: .local) { phase in
             if case .active(let p) = phase { hover(at: p, tod) } else { hover(at: nil, tod) }
         }
-        .onChange(of: model.showSettings || model.showMusic) { hover(at: nil, tod) }
+        .onChange(of: model.noteOpen) { hover(at: nil, tod) }
         .onDisappear { hover(at: nil, tod) }
         // The tooltip follows the object under the pointer (a per-hotspot .help would also go by frame).
         .help(hovered.value.flatMap { name in targets(tod).first { $0.name == name }?.help } ?? "")
@@ -242,6 +252,7 @@ struct DeskScene: View {
         .animation(.easeInOut(duration: 1.2), value: tod)
         .animation(.spring(duration: 0.3), value: model.showSettings)
         .animation(.spring(duration: 0.3), value: model.showMusic)
+        .animation(.spring(duration: 0.3), value: model.showTodos)
         .animation(.spring(duration: 0.3), value: model.showPreview && model.camera == .running)
         .animation(.easeOut(duration: 0.25), value: model.cardKey)
         .animation(.easeOut(duration: 0.25), value: model.cardHidden)

@@ -10,7 +10,7 @@ import SwiftUI
 enum DebugWindow {
     static var window: NSWindow?
 
-    /// States: idle (default), hint, why, study, paused, sleep, settings, break, done, bubble, music, nomusic, nudge.
+    /// States: idle (default), hint, why, study, paused, sleep, settings, break, done, bubble, music, nomusic, nudge, todos.
     /// `--large` draws the bigger panel.
     static func configure(_ model: AppModel) {
         model.persists = false // fixtures never touch the user's settings
@@ -42,6 +42,10 @@ enum DebugWindow {
         }
         if state == "paused" || state == "sleep" { model.togglePause(); model.pausedBySleep = state == "sleep" }
         if state == "settings" { model.showSettings = true }
+        if state == "todos" {
+            model.todos = [Todo(text: "read chapter 4", done: true), Todo(text: "flashcards, 20 words"), Todo(text: "physics problem set")]
+            model.showTodos = true
+        }
         if state == "nudge" { model.nudgeText = Lines.random(for: .lowFocus) }
         if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)); model.timeShift = 27 * 60 }
         if state == "done" { model.clock.tick(at: t0.addingTimeInterval(24 * 3600)); model.nudges = 2 }

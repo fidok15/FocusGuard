@@ -312,3 +312,94 @@ struct MusicNote: View {
         }
     }
 }
+
+/// A lined page over the notebook: today's tasks. Ticked ones fade and get a pencil line through them;
+/// "clear done" takes them off the page.
+struct TodoNote: View {
+    @EnvironmentObject var model: AppModel
+    @StateObject private var draft = Box("")
+    @FocusState private var typing: Bool
+
+    private static let limit = 6
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                Text("today's tasks").font(Ink.hand(13))
+                    .overlay(alignment: .bottom) { WavyLine(seed: 5).stroke(Ink.pencil.opacity(0.8), lineWidth: 1).frame(height: 3).offset(y: 3) }
+                Spacer(minLength: 4)
+                PencilX(help: "Close the tasks") { model.showTodos = false }.offset(x: 4, y: -4)
+            }
+            .padding(.bottom, 2)
+            ForEach($model.todos) { $todo in
+                RuledRow(height: 22, seed: Double(todo.text.count)) {
+                    HStack(spacing: 6) {
+                        TodoBox(done: todo.done) { todo.done.toggle() }
+                        if todo.done {
+                            Text(verbatim: todo.text).lineLimit(1)
+                                .overlay { PencilLine(seed: 4, amp: 0.9).stroke(Ink.pencil, lineWidth: 1.3).frame(height: 2) }
+                                .opacity(0.4)
+                        } else {
+                            TextField("", text: $todo.text).textFieldStyle(.plain)
+                        }
+                    }
+                }
+            }
+            if model.todos.count < Self.limit {
+                RuledRow(height: 22, seed: 9) {
+                    HStack(spacing: 6) {
+                        DoodleBox().stroke(Ink.pencil.opacity(0.5), lineWidth: 1).frame(width: 9, height: 9)
+                        TextField("add a task", text: $draft.value).textFieldStyle(.plain)
+                            .focused($typing)
+                            .onSubmit {
+                                let text = draft.value.trimmingCharacters(in: .whitespaces)
+                                guard !text.isEmpty else { return }
+                                model.todos.append(Todo(text: text))
+                                draft.value = ""
+                            }
+                    }
+                }
+            }
+            if model.todos.contains(where: \.done) {
+                WordLink(title: "clear done", size: 11) { model.todos.removeAll(where: \.done) }
+                    .padding(.top, 6)
+            }
+        }
+        .font(Ink.hand(12))
+        .foregroundStyle(Ink.ballpoint)
+        .animation(.easeOut(duration: 0.2), value: model.todos)
+        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 12)
+        .frame(width: 210, alignment: .leading)
+        .background {
+            CurledNote()
+                .fill(LinearGradient(colors: [Ink.page, Ink.page.opacity(0.94)], startPoint: .top, endPoint: .bottom))
+                .shadow(color: .black.opacity(0.3), radius: 5, x: 1, y: 3)
+        }
+        .overlay(alignment: .top) { WashiTape(width: 58, height: 14).rotationEffect(.degrees(3)).offset(y: -7) }
+        .rotationEffect(.degrees(1))
+        .onAppear { typing = true } // open the notebook and write straight away
+    }
+
+    /// The task's box: a pencil tick when done.
+    private struct TodoBox: View {
+        let done: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                DoodleBox().stroke(Ink.pencil.opacity(0.9), lineWidth: 1).frame(width: 9, height: 9)
+                    .overlay {
+                        Tick().trim(from: 0, to: done ? 1 : 0)
+                            .stroke(Ink.pencil, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                            .frame(width: 9, height: 9)
+                    }
+                    .padding(4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .pencilFocus(action)
+            .accessibilityLabel(Text(done ? "done" : "not done"))
+            .padding(-4)
+        }
+    }
+}
