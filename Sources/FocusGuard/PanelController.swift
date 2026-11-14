@@ -184,6 +184,7 @@ final class PanelController: NSObject {
     private func escape() {
         if model.showSettings { model.showSettings = false }
         else if model.showMusic { model.showMusic = false }
+        else if model.showTodos { model.showTodos = false }
         else if model.showCameraWhy { model.showCameraWhy = false }
         else { hide() }
     }
@@ -205,6 +206,7 @@ final class PanelController: NSObject {
         case 53: escape(); return true
         case 49: // space
             if model.usingKeyboard && model.controlFocused { return false } // the focused control gets it
+            if model.showTodos { return false } // the task list is typed into
             if event.isARepeat { return true } // holding space must not flip pause on and off
             if model.showMusic { model.spotify.send(.playPause); return true } // the record sleeve: space plays or pauses Spotify
             // Only the plain card answers space: a question or the note on top must not start or pause anything.

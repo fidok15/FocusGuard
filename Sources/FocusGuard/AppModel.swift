@@ -19,10 +19,20 @@ final class AppModel: ObservableObject {
     @Published var nudgeText: String?
     /// Frames still arrive but none could be scored for a while (face turned away, poor light): no figure beats a stale one.
     @Published var focusStale = false
-    /// The settings and Spotify notes share one spot: opening one, from anywhere, puts the other away.
-    @Published var showSettings = false { didSet { if showSettings { showMusic = false } } }
+    /// The notes (settings, Spotify, tasks) share the room: opening one, from anywhere, puts the others away.
+    @Published var showSettings = false { didSet { if showSettings { showMusic = false; showTodos = false } } }
     /// The Spotify note over the record player.
-    @Published var showMusic = false { didSet { if showMusic { showSettings = false } } }
+    @Published var showMusic = false { didSet { if showMusic { showSettings = false; showTodos = false } } }
+    /// The task list over the notebook. Closing it drops tasks whose text was erased.
+    @Published var showTodos = false {
+        didSet {
+            if showTodos { showSettings = false; showMusic = false }
+            else { todos.removeAll { $0.text.trimmingCharacters(in: .whitespaces).isEmpty } }
+        }
+    }
+    var noteOpen: Bool { showSettings || showMusic || showTodos }
+    /// Today's tasks, kept until the user clears the done ones.
+    @Published var todos: [Todo] { didSet { save() } }
     /// ⌃⌥⌘F could not be registered (another app owns it); the settings note says so.
     @Published var hotKeyTaken = false
     /// The card's × put it away for a clean room; a click on the clock brings it back.
@@ -114,6 +124,7 @@ final class AppModel: ObservableObject {
         largePanel = d.object(forKey: "largePanel") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
+        todos = d.data(forKey: "todos").flatMap { try? JSONDecoder().decode([Todo].self, from: $0) } ?? []
         launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
 
         spotify.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
@@ -175,7 +186,8 @@ final class AppModel: ObservableObject {
     /// Start with the settings on the card, after the one-time camera explanation.
     func requestStart() {
         showSettings = false
-        showMusic = false // the camera card must be seen, and the notes hide the card
+        showMusic = false
+        showTodos = false // the camera card must be seen, and the notes hide the card
         if useCamera && !cameraExplained && AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
             showCameraWhy = true
         } else {
@@ -234,6 +246,7 @@ final class AppModel: ObservableObject {
     func clockTapped() {
         showSettings = false
         showMusic = false
+        showTodos = false
         showCameraWhy = false
         if cardHidden { cardHidden = false; return } // first click only brings the card back
         if clock.phase.isRunning { togglePause() } else { requestStart() }
@@ -246,14 +259,16 @@ final class AppModel: ObservableObject {
 
     func toggleSettings() {
         showSettings.toggle()
-        showMusic = false
+    }
+
+    func toggleTodos() {
+        showTodos.toggle()
     }
 
     /// Click on the record player: what Spotify plays, with its controls. Asking now is what lets macOS show
     /// its "control Spotify" prompt at a moment the user expects it.
     func toggleMusic() {
         showMusic.toggle()
-        showSettings = false
         if showMusic { spotify.refresh(ask: true) }
     }
 
@@ -277,6 +292,7 @@ final class AppModel: ObservableObject {
         panelOpen = false
         showSettings = false
         showMusic = false
+        showTodos = false
         showCameraWhy = false
     }
 
@@ -408,7 +424,15 @@ final class AppModel: ObservableObject {
         d.set(largePanel, forKey: "largePanel")
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")
+        d.set(try? JSONEncoder().encode(todos), forKey: "todos")
     }
+}
+
+/// One line on the task list in the notebook.
+struct Todo: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var text: String
+    var done = false
 }
 
 /// What the cat says. Each kind has several lines, and the same line never comes twice in a row.
