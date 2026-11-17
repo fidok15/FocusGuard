@@ -51,6 +51,8 @@ public struct SessionClock: Sendable {
     private var studiedBefore: TimeInterval = 0
     /// Where a session ended with stop was, so its summary can take it back.
     private var stopped: (phase: Phase, remaining: TimeInterval)?
+    /// After a break the next study round waits, paused, for the user instead of starting by itself.
+    public var waitAfterBreak = false
 
     public init() {}
 
@@ -118,6 +120,23 @@ public struct SessionClock: Sendable {
         self.stopped = nil
     }
 
+    /// Ends the break now and starts the next study round.
+    public mutating func skipBreak(at now: Date) {
+        tick(at: now)
+        guard case .rest(let round) = phase else { return }
+        pausedRemaining = nil
+        enter(.study(round: round + 1), at: now)
+    }
+
+    /// Makes the running phase longer, paused or not.
+    public mutating func extend(by seconds: TimeInterval, at now: Date) {
+        tick(at: now)
+        guard phase.isRunning else { return }
+        phaseDuration += seconds
+        if let pausedRemaining { self.pausedRemaining = pausedRemaining + seconds }
+        else { phaseEnd = phaseEnd?.addingTimeInterval(seconds) }
+    }
+
     public mutating func pause(at now: Date) {
         tick(at: now) // catch up on phases that ended while asleep
         guard phase.isRunning, !isPaused else { return }
@@ -153,6 +172,10 @@ public struct SessionClock: Sendable {
             enter(.rest(round: round), at: time)
         case .rest(let round):
             enter(.study(round: round + 1), at: time)
+            if waitAfterBreak { // the round stays at its full length until resumed
+                pausedRemaining = phaseDuration
+                phaseEnd = nil
+            }
         case .idle, .done:
             phaseEnd = nil
         }

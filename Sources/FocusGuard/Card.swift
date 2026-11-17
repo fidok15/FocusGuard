@@ -120,7 +120,11 @@ private struct CardContent: View {
                     }
                 }
                 RuledRow(height: 22, seed: 2) {
-                    if model.showsFocus { Sparkline(values: model.history.suffix(40) + [model.focus]).frame(height: 16) }
+                    HStack(spacing: 0) { // the time row is full with the focus figure, so the extra minutes go here
+                        if model.showsFocus { Sparkline(values: model.history.suffix(40) + [model.focus]).frame(height: 16) }
+                        Spacer(minLength: 8)
+                        MoreTime()
+                    }
                 }
                 RuledRow(height: 18, seed: 3) {
                     if let nudge = model.nudgeText {
@@ -134,11 +138,23 @@ private struct CardContent: View {
                     PhaseHeader(title: model.clock.isLongBreak ? "long break \(round) of \(model.clock.config.rounds)"
                                                                : "break \(round) of \(model.clock.config.rounds)")
                 }
-                RuledRow(height: 34, seed: 1) { Num(text: model.remainingText, color: Ink.ballpoint.opacity(model.clock.isPaused ? 0.5 : 1)) }
+                RuledRow(height: 34, seed: 1) {
+                    HStack(alignment: .lastTextBaseline, spacing: 0) {
+                        Num(text: model.remainingText, color: Ink.ballpoint.opacity(model.clock.isPaused ? 0.5 : 1))
+                        Spacer(minLength: 4)
+                        MoreTime()
+                    }
+                }
                 RuledRow(height: 20, seed: 2) {
                     Text(model.clock.isPaused ? pausedLine : String(localized: "stretch, drink some water")).font(Ink.hand(12))
                 }
-                RuledRow(height: 18, seed: 3) { Text("camera is off").font(Ink.hand(11)).opacity(0.75) }
+                RuledRow(height: 18, seed: 3) {
+                    HStack(spacing: 0) {
+                        Text("camera is off").font(Ink.hand(11)).opacity(0.75)
+                        Spacer(minLength: 4)
+                        WordLink(title: "skip break", size: 12, action: model.skipBreak).padding(.trailing, 4)
+                    }
+                }
             case "why":
                 RuledRow(height: 18) { Text("about the camera").font(Ink.hand(12)) }
                 Text("FocusGuard looks at you through the camera only while you study. Nothing is saved or sent anywhere.")
@@ -226,6 +242,17 @@ private struct PhaseHeader: View {
             .padding(.trailing, 14) // clear of the tape on the corner
             .font(Ink.hand(12))
         }
+    }
+}
+
+/// "+5 min" right after the time: the running phase gets five more minutes.
+private struct MoreTime: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        WordLink(title: "+5 min", size: 12, action: model.extend)
+            .accessibilityLabel(Text("five more minutes"))
+            .padding(.trailing, 4)
     }
 }
 

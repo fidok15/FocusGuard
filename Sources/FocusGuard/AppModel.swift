@@ -70,6 +70,8 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var soundsOn: Bool { didSet { save() } }
+    /// After a break the next round waits for a click or space instead of starting by itself.
+    @Published var waitForMe: Bool { didSet { save(); clock.waitAfterBreak = waitForMe } }
     /// Draws the whole panel 25 % larger, for reading the hand-written text more easily.
     @Published var largePanel: Bool { didSet { save() } }
     @Published var launchAtLogin: Bool {
@@ -121,11 +123,13 @@ final class AppModel: ObservableObject {
         showPreview = d.object(forKey: "showPreview") as? Bool ?? false
         useCamera = d.object(forKey: "useCamera") as? Bool ?? true
         soundsOn = d.object(forKey: "soundsOn") as? Bool ?? true
+        waitForMe = d.object(forKey: "waitForMe") as? Bool ?? false
         largePanel = d.object(forKey: "largePanel") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
         todos = d.data(forKey: "todos").flatMap { try? JSONDecoder().decode([Todo].self, from: $0) } ?? []
         launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
+        clock.waitAfterBreak = waitForMe
 
         spotify.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         cameraService.onSignals = { [weak self] signals, t in
@@ -248,6 +252,21 @@ final class AppModel: ObservableObject {
         pausedBySleep = false
         if clock.isPaused { clock.resume(at: monoNow) } else { clock.pause(at: monoNow) }
         phaseChanged()
+    }
+
+    /// "skip" on the break card: the next study round starts now.
+    func skipBreak() {
+        tick()
+        clock.skipBreak(at: monoNow)
+        pausedBySleep = false
+        phaseStart = Date()
+        phaseChanged()
+    }
+
+    /// "+5 min" on the study and break cards.
+    func extend() {
+        tick()
+        clock.extend(by: 5 * 60, at: monoNow)
     }
 
     private func pauseBecauseAway() {
@@ -438,6 +457,7 @@ final class AppModel: ObservableObject {
         d.set(showPreview, forKey: "showPreview")
         d.set(useCamera, forKey: "useCamera")
         d.set(soundsOn, forKey: "soundsOn")
+        d.set(waitForMe, forKey: "waitForMe")
         d.set(largePanel, forKey: "largePanel")
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")
