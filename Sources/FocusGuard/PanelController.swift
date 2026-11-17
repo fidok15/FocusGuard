@@ -124,8 +124,8 @@ final class PanelController: NSObject {
             model.applyHotKey = { [weak self] in registerHotKey($0) { self?.toggle() } }
             if !model.applyHotKey(model.hotKey) { model.hotKeyTaken = model.hotKey.label }
         }
-        // "bigger panel": resize the window around the scaled scene, keeping it under the icon.
-        model.$largePanel.dropFirst().sink { [weak self] _ in
+        // Panel size: resize the window around the scaled scene, keeping it under the icon.
+        model.$panelScale.dropFirst().removeDuplicates().sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
                 let s = self.model.panelScale

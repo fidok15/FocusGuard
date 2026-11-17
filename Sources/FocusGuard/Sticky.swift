@@ -103,6 +103,10 @@ private struct Flap: Shape {
 /// A line you drag a graphite dot along; the stretch behind the dot is gone over twice.
 private struct HandSlider: View {
     @Binding var value: Double
+    var label: LocalizedStringKey = "alert sensitivity"
+    var valueText: (Double) -> String = { "\(Int(($0 * 100).rounded())) %" }
+    /// Called when a drag ends or a key steps the value, for settings too heavy to follow every move.
+    var onEnd: () -> Void = {}
 
     var body: some View {
         GeometryReader { g in
@@ -118,7 +122,7 @@ private struct HandSlider: View {
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { v in
                 value = min(max(Double((v.location.x - 5.5) / (w - 11)), 0), 1)
-            })
+            }.onEnded { _ in onEnd() })
         }
         .frame(height: 18)
         // Arrow keys and VoiceOver adjust it in tenths, like a native slider.
@@ -126,18 +130,27 @@ private struct HandSlider: View {
         .onKeyPress(.leftArrow) { step(-0.1); return .handled }
         .onKeyPress(.rightArrow) { step(0.1); return .handled }
         .accessibilityElement()
-        .accessibilityLabel(Text("alert sensitivity"))
-        .accessibilityValue(Text(verbatim: "\(Int((value * 100).rounded())) %"))
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text(verbatim: valueText(value)))
         .accessibilityAdjustableAction { $0 == .increment ? step(0.1) : step(-0.1) }
     }
 
     private func step(_ by: Double) {
         value = min(max(((value + by) * 10).rounded() / 10, 0), 1)
+        onEnd()
     }
 }
 
 struct SettingsNote: View {
     @EnvironmentObject var model: AppModel
+    /// The panel size slider's position (0…1) while it is dragged; the panel is resized when it is let go,
+    /// since resizing under the pointer would move the slider away from it.
+    @StateObject private var size = Box(0.0)
+
+    private static func scale(_ position: Double) -> CGFloat {
+        let r = AppModel.panelScales
+        return ((r.lowerBound + CGFloat(position) * (r.upperBound - r.lowerBound)) * 20).rounded() / 20 // 5 % steps
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -155,6 +168,17 @@ struct SettingsNote: View {
                 Spacer()
                 Text("sensitive")
             }.font(Ink.hand(12))
+            HStack(spacing: 8) {
+                Text("panel size").font(Ink.hand(12))
+                HandSlider(value: $size.value, label: "panel size", valueText: { "\(Int((Self.scale($0) * 100).rounded())) %" }) {
+                    model.panelScale = Self.scale(size.value)
+                }
+            }
+            .padding(.top, 4)
+            .onAppear {
+                let r = AppModel.panelScales
+                size.value = Double((model.panelScale - r.lowerBound) / (r.upperBound - r.lowerBound))
+            }
             VStack(alignment: .leading, spacing: 1) {
                 BoxChoice(title: "use camera", checked: model.useCamera, size: 12) { model.useCamera.toggle() }
                 if model.useCamera {
@@ -167,7 +191,6 @@ struct SettingsNote: View {
                     BoxChoice(title: "rain sound", checked: model.rainSound, size: 12) { model.rainSound.toggle() }.padding(.leading, 13)
                     BoxChoice(title: "rain animation", checked: model.rainMotion, size: 12) { model.rainMotion.toggle() }.padding(.leading, 13)
                 }
-                BoxChoice(title: "bigger panel", checked: model.largePanel, size: 12) { model.largePanel.toggle() }
                 BoxChoice(title: "launch at login", checked: model.launchAtLogin, size: 12) { model.launchAtLogin.toggle() }
                 if model.loginApproval {
                     Button(action: SMAppService.openSystemSettingsLoginItems) {

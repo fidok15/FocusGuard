@@ -65,7 +65,7 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 - macOS asks once whether FocusGuard may control Spotify. FocusGuard never starts Spotify on its own.
 
 ### More
-- **Bigger panel.** One setting draws the whole desk 25 % larger.
+- **Panel size.** A slider in the settings draws the whole desk anywhere from 80 % to 150 % of its size.
 - **Launch at login**, from the settings.
 - **Right-click menu.** Right-click the menu bar icon to start, pause or stop a session, or to open the tasks, the music note or the settings straight away.
 - **Keyboard support.** Tab moves between controls, Space pauses, Esc steps back one layer, ⌘W hides the panel, ⌘, opens the settings, and ⌘Q quits.

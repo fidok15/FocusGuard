@@ -19,7 +19,7 @@ enum DebugWindow {
         let state = args.firstIndex(of: "--state").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? "idle"
         let t0 = Mono.now()
         model.seenHint = state != "hint"
-        model.largePanel = args.contains("--large")
+        model.panelScale = args.contains("--large") ? 1.25 : 1
         model.cameraExplained = true
         model.soundsOn = false
         if state == "music" {
