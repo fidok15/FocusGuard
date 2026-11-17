@@ -399,6 +399,11 @@ func spotifyReplyParses() {
     check(NowPlaying.oembedThumbnail(Data(#"{"thumbnail_url":"https://evil.example/x.jpg"}"#.utf8)) == nil)
     check(NowPlaying.parse(["paused", "A", "B", "C", "file:///etc/passwd", "false", "true"].joined(separator: d))?.artworkURL == nil)
     check(NowPlaying.parse(["paused", "A", "B", "C", "https://evil.example/x.jpg", "false", "true"].joined(separator: d))?.artworkURL == nil)
+    check(NowPlaying.allowedDownload(URL(string: "https://open.spotify.com/oembed?url=x")!))
+    check(NowPlaying.allowedDownload(URL(string: "https://i.scdn.co/image/ab67")!))
+    check(!NowPlaying.allowedDownload(URL(string: "http://i.scdn.co/image/ab67")!))
+    check(!NowPlaying.allowedDownload(URL(string: "https://open.spotify.com.evil.example/x")!))
+    check(!NowPlaying.allowedDownload(URL(string: "https://evil.example/i.scdn.co")!))
 }
 
 func monoNeverGoesBack() {

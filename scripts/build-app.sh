@@ -19,5 +19,6 @@ for scene in morning day sunset night rain; do
     cp "art/scene_$scene.png" "$app/Contents/Resources/"
 done
 
-codesign --force --sign - "$app"
+# Hardened runtime, still ad-hoc signed: only the camera and Apple events (Spotify) are allowed, nothing else.
+codesign --force --options runtime --entitlements Resources/FocusGuard.entitlements --sign - "$app"
 echo "Built $app"

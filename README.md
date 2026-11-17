@@ -27,12 +27,12 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 - **Lives in the menu bar.** No Dock icon and no window of its own. Click the menu bar icon, or press **⌃⌥⌘F** anywhere, to open the desk.
 - **The sky follows your clock.** The view outside the window changes with the time of day: morning, day, sunset and night.
 - **Or let it rain.** Tick **rain outside** in the settings for a rainy evening room all day, with rain falling past the cat and a quiet rain sound. Both the sound and the falling rain can be turned off on their own.
-- **Everything on the desk does something.** Hover over an object to see its outline, then click it:
+- **Everything on the desk does something.** The first time you open the desk, every object you can click is outlined for a moment. Hover over an object to see its outline, then click it:
 
   | Object | What it does |
   | --- | --- |
   | Desk clock | Starts a session. During a session it pauses or resumes. |
-  | Mug | Pauses or resumes. |
+  | Mug | Pauses or resumes, during a session. |
   | Sticky notes on the wall | Open the settings. |
   | Record player | Opens Spotify's now-playing note. |
   | Notebook | Opens today's task list. |
@@ -42,10 +42,12 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 
 ### The timer
 - **Settings right on the card.** Before a session, the paper card above the clock shows study length, break length and the number of rounds, each with − and +. Click **start**, or click the clock.
-- **Pause and stop in one click.** During a session, the card shows the time left with **pause** and **stop**. Space also pauses, and so do the clock and the mug.
+- **Pause and stop in one click.** During a session, the card shows the time left with **pause** and **stop**. Space also pauses, and so do the clock and the mug. Stopped by mistake? The summary card has **resume**, which carries on where you left off.
+- **A little more time, or a shorter break.** **+5 min** adds five minutes to the study round or break you're in. On a break, **skip break** starts the next round right away.
+- **Wait for me.** With **wait for me after breaks** ticked in the settings, the next round doesn't start on its own after a break. It waits for a click on the clock, or Space.
 - **A clean view when you want it.** Every card and note is held by washi tape with a pencil ×. Click the × to put the card away while the session keeps running. Click the clock to bring it back.
 - **Long breaks.** In a session with more than 4 rounds, the break after every 4th round is three times as long (at most 30 minutes).
-- **A summary at the end.** You see minutes studied, your average focus with a small chart, and how many nudges you got.
+- **A summary at the end.** You see the minutes you actually studied (breaks and pauses don't count), your average focus with a small chart, and how many nudges you got. You get it when you stop a session early, too.
 
 ### Today's tasks
 - **A to-do list on the notebook.** Click the open notebook to see today's tasks. Type a task and press Return to add the next one, up to 6.
@@ -65,6 +67,7 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 ### More
 - **Bigger panel.** One setting draws the whole desk 25 % larger.
 - **Launch at login**, from the settings.
+- **Right-click menu.** Right-click the menu bar icon to start, pause or stop a session, or to open the tasks, the music note or the settings straight away.
 - **Keyboard support.** Tab moves between controls, Space pauses, Esc steps back one layer, ⌘W hides the panel, ⌘, opens the settings, and ⌘Q quits.
 - **Languages:** English and Polish.
 
@@ -74,7 +77,7 @@ Requires **macOS 14 Sonoma or later**, on Apple silicon or Intel.
 
 ### Download
 
-1. Download `FocusGuard.zip` from [Releases](../../releases) and unzip it.
+1. Download `FocusGuard.zip` from [Releases](../../releases). Each release lists the SHA-256 of the zip. Since the app is not notarized, it's worth checking that your download matches before you open it: run `shasum -a 256 ~/Downloads/FocusGuard.zip` and compare. Then unzip it.
 2. Move `FocusGuard.app` to **Applications**.
 3. Open it. FocusGuard is free and open source but not notarized by Apple, so macOS blocks the first launch. To open it anyway, choose one option:
    - **macOS 15 Sequoia and later:** after the warning, open **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to FocusGuard.
@@ -82,6 +85,8 @@ Requires **macOS 14 Sonoma or later**, on Apple silicon or Intel.
    - **Terminal:** run `xattr -dr com.apple.quarantine /Applications/FocusGuard.app`.
 4. Look for the timer icon in the menu bar.
 5. Allow camera access when you start your first study session, if you want focus tracking. If you said no, turn FocusGuard on later in **System Settings › Privacy & Security › Camera**. The timer works without the camera.
+
+**After an update**, macOS may ask again for the camera or for control of Spotify. The app has no paid Apple signature, so macOS can treat each new version as a new app. Allow it again, or turn FocusGuard back on in **System Settings › Privacy & Security**.
 
 ### Build from source
 
@@ -97,12 +102,19 @@ open dist/FocusGuard.app     # or move it to /Applications first
 
 ### Quit or uninstall
 
-To quit, press **⌘Q** while the desk is open, or right-click the menu bar icon and choose **Quit FocusGuard**. To uninstall, quit FocusGuard and delete `FocusGuard.app`.
+To quit, press **⌘Q** while the desk is open, or right-click the menu bar icon and choose **Quit FocusGuard**. To uninstall, quit FocusGuard and delete `FocusGuard.app`. If you turned on **launch at login**, turn it off first, or remove FocusGuard in **System Settings › General › Login Items**.
+
+To also remove its settings and tasks, and the camera permission, run:
+
+```sh
+defaults delete io.github.fidok15.FocusGuard
+tccutil reset Camera io.github.fidok15.FocusGuard
+```
 
 ## Privacy
 
 - Camera frames are analyzed in memory on your Mac with Apple's Vision framework, then thrown away. Nothing is recorded, saved or uploaded.
-- The only network traffic is for the album cover of the song Spotify is playing. FocusGuard looks up the cover link on `open.spotify.com` and downloads the image from Spotify's image server.
+- The only network traffic is for the album cover of the song Spotify is playing. FocusGuard looks up the cover link on `open.spotify.com` and downloads the image from Spotify's image server. Those requests can't be redirected away from Spotify's servers, and a cover larger than 2 MB is refused.
 
 ## How the focus score works
 
