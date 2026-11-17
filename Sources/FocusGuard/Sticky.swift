@@ -161,13 +161,6 @@ struct SettingsNote: View {
                     BoxChoice(title: "camera preview", checked: model.showPreview, size: 12) { model.showPreview.toggle() }
                 }
                 BoxChoice(title: "sounds", checked: model.soundsOn, size: 12) { model.soundsOn.toggle() }
-                BoxChoice(title: "notify when time is up", checked: model.notifyPhases, size: 12) { model.notifyPhases.toggle() }
-                if model.notifyPhases && model.notifyDenied {
-                    Button { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!) } label: {
-                        Text("allow notifications in System Settings").font(Ink.hand(11)).foregroundStyle(Ink.red)
-                            .underline().fixedSize(horizontal: false, vertical: true)
-                    }.buttonStyle(.plain)
-                }
                 BoxChoice(title: "wait for me after breaks", checked: model.waitForMe, size: 12) { model.waitForMe.toggle() }
                 BoxChoice(title: "rain outside", checked: model.rain, size: 12) { model.rain.toggle() }
                 if model.rain {
