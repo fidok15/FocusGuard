@@ -154,7 +154,7 @@ private struct CardContent: View {
             case "done":
                 RuledRow(height: 18) {
                     HStack(alignment: .lastTextBaseline) {
-                        Text("done!").font(Ink.hand(13))
+                        Text(model.clock.stoppedIn == nil ? "done!" : "stopped").font(Ink.hand(13))
                         Spacer(minLength: 4)
                         if !model.history.isEmpty { Text("nudges: \(model.nudges)").font(Ink.hand(11)) }
                     }
@@ -174,15 +174,19 @@ private struct CardContent: View {
                             Sparkline(values: model.history).frame(width: 60, height: 16)
                             Num(text: "\(average)%", size: 16)
                         }
+                    } else if let round = model.clock.stoppedIn?.round {
+                        Text("round \(round) of \(model.clock.config.rounds)").font(Ink.hand(12))
                     } else {
                         Text("\(model.clock.config.rounds) rounds").font(Ink.hand(12))
                     }
                 }
                 RuledRow(height: 18, seed: 3) {
-                    HStack {
-                        WordLink(title: "adjust", size: 12, action: model.stop) // back to the idle card and its settings
+                    HStack(spacing: 0) {
+                        // A stop is one click away from pause, so its summary can take it back.
+                        if model.clock.stoppedIn != nil { WordLink(title: "resume", size: 12, action: model.undoStop) }
                         Spacer(minLength: 4)
-                        WordLink(title: "new session", size: 12, underlined: true, action: model.requestStart)
+                        WordLink(title: "adjust", size: 12, action: model.reset) // back to the idle card and its settings
+                        WordLink(title: "new session", size: 12, underlined: true, action: model.requestStart).padding(.leading, 9)
                     }
                 }
             default: // idle: the session's settings right on the card, and start

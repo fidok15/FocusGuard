@@ -26,6 +26,12 @@ public enum Phase: Equatable, Sendable {
     case done
 
     public var isStudy: Bool { if case .study = self { true } else { false } }
+    public var round: Int? {
+        switch self {
+        case .study(let round), .rest(let round): round
+        case .idle, .done: nil
+        }
+    }
     public var isRunning: Bool {
         switch self {
         case .study, .rest: true
@@ -41,10 +47,23 @@ public struct SessionClock: Sendable {
     public private(set) var phaseDuration: TimeInterval = 0
     private var phaseEnd: Date?
     private var pausedRemaining: TimeInterval?
+    /// Study time of the study phases already over.
+    private var studiedBefore: TimeInterval = 0
+    /// Where a session ended with stop was, so its summary can take it back.
+    private var stopped: (phase: Phase, remaining: TimeInterval)?
 
     public init() {}
 
     public var isPaused: Bool { pausedRemaining != nil }
+    /// The phase a stopped session was in; nil when it ran to the end.
+    public var stoppedIn: Phase? { stopped?.phase }
+
+    /// Time actually spent in study phases, pauses excluded.
+    public func studied(at now: Date) -> TimeInterval {
+        let current = stopped.map { $0.phase.isStudy ? phaseDuration - $0.remaining : 0 }
+            ?? (phase.isStudy ? phaseDuration - remaining(at: now) : 0)
+        return studiedBefore + current
+    }
 
     /// Every 4th break is three times as long, capped at 30 minutes.
     public func breakMinutes(after round: Int) -> Int {
@@ -66,15 +85,37 @@ public struct SessionClock: Sendable {
         self.config = SessionConfig(studyMinutes: max(1, config.studyMinutes),
                                     breakMinutes: max(1, config.breakMinutes),
                                     rounds: max(1, config.rounds))
-        pausedRemaining = nil
+        reset()
         enter(.study(round: 1), at: now)
     }
 
-    public mutating func stop() {
+    /// Back to idle, forgetting the session.
+    public mutating func reset() {
         phase = .idle
         phaseEnd = nil
         pausedRemaining = nil
         phaseDuration = 0
+        studiedBefore = 0
+        stopped = nil
+    }
+
+    /// Ends a running session early, on its summary. Stopped within its first seconds, it just goes back to idle.
+    public mutating func stop(at now: Date) {
+        tick(at: now)
+        guard phase.isRunning else { return }
+        if studied(at: now) < 10 { return reset() }
+        stopped = (phase, remaining(at: now))
+        phase = .done
+        phaseEnd = nil
+        pausedRemaining = nil
+    }
+
+    /// Takes a stop back: the session carries on where it was stopped.
+    public mutating func undoStop(at now: Date) {
+        guard let stopped else { return }
+        phase = stopped.phase
+        phaseEnd = now.addingTimeInterval(stopped.remaining)
+        self.stopped = nil
     }
 
     public mutating func pause(at now: Date) {
@@ -104,9 +145,11 @@ public struct SessionClock: Sendable {
     private mutating func advance(at time: Date) {
         switch phase {
         case .study(let round) where round >= config.rounds:
+            studiedBefore += phaseDuration
             phase = .done
             phaseEnd = nil
         case .study(let round):
+            studiedBefore += phaseDuration
             enter(.rest(round: round), at: time)
         case .rest(let round):
             enter(.study(round: round + 1), at: time)

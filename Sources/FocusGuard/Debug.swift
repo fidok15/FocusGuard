@@ -10,7 +10,7 @@ import SwiftUI
 enum DebugWindow {
     static var window: NSWindow?
 
-    /// States: idle (default), hint, why, study, paused, sleep, settings, break, done, bubble, music, nomusic, nudge, todos.
+    /// States: idle (default), hint, why, study, paused, sleep, settings, break, done, stopped, bubble, music, nomusic, nudge, todos.
     /// `--large` draws the bigger panel.
     static func configure(_ model: AppModel) {
         model.persists = false // fixtures never touch the user's settings
@@ -30,7 +30,7 @@ enum DebugWindow {
         if state == "nomusic" { model.showMusic = true }
         model.showPreview = false
         if state == "why" { model.cameraExplained = false; model.showCameraWhy = true }
-        if ["study", "paused", "sleep", "settings", "break", "done", "nudge"].contains(state) {
+        if ["study", "paused", "sleep", "settings", "break", "done", "stopped", "nudge"].contains(state) {
             model.start(withCamera: false) // no capture and no permission prompt; the card is told the camera runs
             model.timerOnly = false
             model.camera = .running
@@ -49,6 +49,7 @@ enum DebugWindow {
         if state == "nudge" { model.nudgeText = Lines.random(for: .lowFocus) }
         if state == "break" { model.clock.tick(at: t0.addingTimeInterval(25 * 60 + 1)); model.timeShift = 27 * 60 }
         if state == "done" { model.clock.tick(at: t0.addingTimeInterval(24 * 3600)); model.nudges = 2 }
+        if state == "stopped" { model.stop(); model.nudges = 1 }
         if state == "bubble" {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 Bubble.show(Lines.random(for: .lowFocus), cat: model.timeOfDay.art.catFace)

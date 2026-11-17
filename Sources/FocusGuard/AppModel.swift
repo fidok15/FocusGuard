@@ -171,8 +171,9 @@ final class AppModel: ObservableObject {
         let s = Int(remaining.rounded(.up))
         return String(format: "%d:%02d", s / 60, s % 60)
     }
+    /// Minutes actually studied: study phases only, pauses left out.
+    var studiedMinutes: Int { Int((clock.studied(at: monoNow) / 60).rounded()) }
     /// nil without camera data: no figure is better than a made-up one.
-    var studiedMinutes: Int { clock.config.studyMinutes * clock.config.rounds }
     var averageFocus: Int? { history.isEmpty ? nil : Int(history.reduce(0, +) / Double(history.count)) }
     /// Focus figures need a running camera that has finished calibrating on a real face.
     var showsFocus: Bool { !timerOnly && camera == .running && !calibrating && !focusStale }
@@ -217,15 +218,27 @@ final class AppModel: ObservableObject {
         cardHidden = false
         phaseStart = Date()
         clock.start(config, at: monoNow)
-        // Keeps App Nap from throttling the timer without blocking idle sleep.
-        activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
-                                                         reason: "Study session timer")
         phaseChanged()
     }
 
+    /// Ends the session on its summary, which can take the stop back.
     func stop() {
-        clock.stop()
+        clock.stop(at: monoNow)
         pausedBySleep = false
+        cardHidden = false
+        phaseChanged()
+    }
+
+    /// "resume" on the summary of a stopped session.
+    func undoStop() {
+        clock.undoStop(at: monoNow)
+        phaseStart = Date()
+        phaseChanged()
+    }
+
+    /// From the summary back to the idle card and its settings.
+    func reset() {
+        clock.reset()
         phaseChanged()
     }
 
@@ -370,7 +383,11 @@ final class AppModel: ObservableObject {
             camera = .off
             calibrating = false
         }
-        if !clock.phase.isRunning, let activity {
+        if clock.phase.isRunning, activity == nil {
+            // Keeps App Nap from throttling the timer without blocking idle sleep.
+            activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
+                                                             reason: "Study session timer")
+        } else if !clock.phase.isRunning, let activity {
             ProcessInfo.processInfo.endActivity(activity)
             self.activity = nil
         }

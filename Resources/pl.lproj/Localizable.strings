@@ -104,3 +104,5 @@
 "Close the tasks" = "Zamknij zadania";
 "done" = "zrobione";
 "not done" = "do zrobienia";
+"stopped" = "zatrzymano";
+"round %lld of %lld" = "runda %lld z %lld";
