@@ -4,6 +4,7 @@ import Combine
 import FocusCore
 import ServiceManagement
 import SwiftUI
+import UserNotifications
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -74,6 +75,18 @@ final class AppModel: ObservableObject {
     @Published var rain: Bool { didSet { save(); updateRainSound() } }
     @Published var rainSound: Bool { didSet { save(); updateRainSound() } }
     @Published var rainMotion: Bool { didSet { save() } }
+    /// A system notification at each phase change, for when sounds are off and the panel is closed.
+    @Published var notifyPhases: Bool {
+        didSet {
+            save()
+            if notifyPhases && !oldValue { requestNotifications() }
+        }
+    }
+    /// Notifications were turned on but macOS does not allow them; the settings note says so.
+    @Published var notifyDenied = false
+    /// The desk objects are outlined once, the first time the panel opens, so it is clear they can be clicked.
+    @Published var showTour = false
+    var seenTour: Bool { didSet { save() } }
     /// After a break the next round waits for a click or space instead of starting by itself.
     @Published var waitForMe: Bool { didSet { save(); clock.waitAfterBreak = waitForMe } }
     /// Draws the whole panel 25 % larger, for reading the hand-written text more easily.
@@ -135,6 +148,8 @@ final class AppModel: ObservableObject {
         largePanel = d.object(forKey: "largePanel") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
+        notifyPhases = d.object(forKey: "notifyPhases") as? Bool ?? false
+        seenTour = d.object(forKey: "seenTour") as? Bool ?? d.bool(forKey: "seenHint") // someone who has used the app already knows the desk
         todos = d.data(forKey: "todos").flatMap { try? JSONDecoder().decode([Todo].self, from: $0) } ?? []
         launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
         clock.waitAfterBreak = waitForMe
@@ -319,6 +334,19 @@ final class AppModel: ObservableObject {
         syncLogin()
         spotify.refresh(ask: false)
         updateRainSound()
+        if !seenTour {
+            seenTour = true
+            showTour = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.showTour = false }
+        }
+        if notifyPhases { requestNotifications() } // permission may have been changed in System Settings
+    }
+
+    /// Asks macOS only when the user turns notifications on; afterwards just reads the answer.
+    private func requestNotifications() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, _ in
+            Task { @MainActor in self.notifyDenied = !granted }
+        }
     }
 
     /// Launch at login can change behind our back (System Settings), so read it again whenever the panel opens.
@@ -389,6 +417,12 @@ final class AppModel: ObservableObject {
         let sound = a == .backToWork ? "Pop" : "Glass"
         if soundsOn { NSSound(named: sound)?.play() }
         Bubble.show(text, cat: timeOfDay.art.catFace) // a notification: shown over the open panel too
+        if notifyPhases && !notifyDenied {
+            let content = UNMutableNotificationContent()
+            content.title = "FocusGuard"
+            content.body = text
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "phase", content: content, trigger: nil))
+        }
         Self.speak(text)
     }
 
@@ -480,6 +514,8 @@ final class AppModel: ObservableObject {
         d.set(largePanel, forKey: "largePanel")
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")
+        d.set(notifyPhases, forKey: "notifyPhases")
+        d.set(seenTour, forKey: "seenTour")
         d.set(try? JSONEncoder().encode(todos), forKey: "todos")
     }
 }

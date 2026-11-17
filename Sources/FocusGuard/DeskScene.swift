@@ -159,10 +159,11 @@ struct DeskScene: View {
     private func targets(_ tod: TimeOfDay) -> [(name: String, shape: OutlineShape, help: LocalizedStringKey)] {
         [("record", OutlineShape(groups: [tod.props.record]), "Spotify: now playing"),
          ("sticky", OutlineShape(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false), "Settings"),
-         ("mug", OutlineShape(groups: [tod.props.mug]), "Pause / resume"),
+         // The mug only pauses and resumes, so outside a session it is just a mug.
+         model.clock.phase.isRunning ? ("mug", OutlineShape(groups: [tod.props.mug]), "Pause / resume") : nil,
          ("clock", OutlineShape(groups: [tod.props.clock]), "Start, pause or resume a study session"),
          ("notebook", OutlineShape(groups: [tod.props.notebook], smooth: false), "Today's tasks"),
-         ("cat", OutlineShape(groups: [tod.art.silhouette]), "Pet the cat")]
+         ("cat", OutlineShape(groups: [tod.art.silhouette]), "Pet the cat")].compactMap { $0 }
     }
 
     private func hover(at point: CGPoint?, _ tod: TimeOfDay) {
@@ -175,7 +176,7 @@ struct DeskScene: View {
         hovered.value = name
     }
 
-    private func lit(_ name: String) -> Bool { hovered.value == name || forcedHover?.contains(name) == true }
+    private func lit(_ name: String) -> Bool { hovered.value == name || model.showTour || forcedHover?.contains(name) == true }
 
     var body: some View {
         let tod = model.timeOfDay
@@ -206,7 +207,9 @@ struct DeskScene: View {
 
             Hotspot(groups: [tod.props.notebook], smooth: false, lit: lit("notebook"), help: "Today's tasks", action: model.toggleTodos)
             Hotspot(groups: [tod.props.clock], lit: lit("clock"), help: "Start, pause or resume a study session", action: model.clockTapped)
-            Hotspot(groups: [tod.props.mug], lit: lit("mug"), help: "Pause / resume", action: model.togglePause)
+            if model.clock.phase.isRunning {
+                Hotspot(groups: [tod.props.mug], lit: lit("mug"), help: "Pause / resume", action: model.togglePause)
+            }
             Hotspot(groups: [tod.props.noteLeft, tod.props.noteRight], smooth: false, lit: lit("sticky"), help: "Settings") {
                 model.toggleSettings()
             }
