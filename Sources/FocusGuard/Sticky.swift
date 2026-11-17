@@ -177,8 +177,16 @@ struct SettingsNote: View {
                 } else if let note = model.loginNote {
                     Text(note).font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
                 }
-                if model.hotKeyTaken {
-                    Text("⌃⌥⌘F is used by another app").font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 5) {
+                    Text("shortcut").font(Ink.hand(12))
+                    WordLink(title: model.recordingShortcut ? "press keys…" : LocalizedStringKey(model.hotKey.label), size: 12, underlined: true) {
+                        model.recordingShortcut.toggle()
+                    }
+                    .accessibilityLabel(model.recordingShortcut ? Text("press keys…") : Text("shortcut \(model.hotKey.label), click to change"))
+                }
+                .padding(.top, 3)
+                if let taken = model.hotKeyTaken {
+                    Text("\(taken) is used by another app").font(Ink.hand(11)).foregroundStyle(Ink.red).fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.top, 4)

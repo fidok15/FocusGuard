@@ -65,7 +65,10 @@
 "on" = "włączone";
 "off" = "wyłączone";
 "bigger panel" = "większy panel";
-"⌃⌥⌘F is used by another app" = "⌃⌥⌘F zajęła inna aplikacja";
+"%@ is used by another app" = "%@ zajęła inna aplikacja";
+"shortcut" = "skrót";
+"press keys…" = "naciśnij skrót…";
+"shortcut %@, click to change" = "skrót %@, kliknij, aby zmienić";
 "Close" = "Zamknij";
 "Spotify: now playing" = "Spotify: teraz gra";
 "now playing" = "teraz gra";

@@ -20,23 +20,58 @@ final class FloatingPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { onCancel() }
 }
 
-/// ⌃⌥⌘F anywhere toggles the panel. Carbon hot keys need no Accessibility permission.
-@MainActor private var hotKeyAction: (() -> Void)?
+/// A global shortcut as Carbon wants it, and how it is written.
+struct HotKey: Equatable {
+    var code: UInt32
+    var modifiers: UInt32
+    var label: String
 
-/// Returns false when the shortcut could not be had (another app registered it first).
+    static let standard = HotKey(code: UInt32(kVK_ANSI_F), modifiers: UInt32(controlKey | optionKey | cmdKey), label: "⌃⌥⌘F")
+
+    /// The shortcut pressed in `event`, or nil without ⌘, ⌃ or ⌥: a plain key would fire while typing in any app.
+    init?(_ event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard !flags.isDisjoint(with: [.command, .control, .option]) else { return nil }
+        var modifiers = 0, label = ""
+        for (flag, carbon, symbol) in [(NSEvent.ModifierFlags.control, controlKey, "⌃"), (.option, optionKey, "⌥"),
+                                       (.shift, shiftKey, "⇧"), (.command, cmdKey, "⌘")] where flags.contains(flag) {
+            modifiers |= carbon
+            label += symbol
+        }
+        let key = event.charactersIgnoringModifiers ?? ""
+        self.init(code: UInt32(event.keyCode), modifiers: UInt32(modifiers), label: label + (key == " " ? "Space" : key.uppercased()))
+    }
+
+    init(code: UInt32, modifiers: UInt32, label: String) {
+        self.code = code
+        self.modifiers = modifiers
+        self.label = label
+    }
+}
+
+/// The shortcut toggles the panel from anywhere. Carbon hot keys need no Accessibility permission.
+@MainActor private var hotKeyAction: (() -> Void)?
+@MainActor private var hotKeyRef: EventHotKeyRef?
+@MainActor private var hotKeyHandler = false
+
+/// Puts `key` in place of the current shortcut. Returns false when it could not be had (another app registered it first).
 @MainActor
-private func registerHotKey(_ action: @escaping () -> Void) -> Bool {
+private func registerHotKey(_ key: HotKey, _ action: @escaping () -> Void) -> Bool {
     hotKeyAction = action
-    var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-    let installed = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-        DispatchQueue.main.async { MainActor.assumeIsolated { hotKeyAction?() } }
-        return noErr
-    }, 1, &spec, nil, nil)
+    if !hotKeyHandler {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        hotKeyHandler = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { hotKeyAction?() } }
+            return noErr
+        }, 1, &spec, nil, nil) == noErr
+    }
+    if let old = hotKeyRef { UnregisterEventHotKey(old) }
     var ref: EventHotKeyRef?
-    let registered = RegisterEventHotKey(UInt32(kVK_ANSI_F), UInt32(controlKey | optionKey | cmdKey),
-                                         EventHotKeyID(signature: OSType(0x46474B59), id: 1), GetApplicationEventTarget(), 0, &ref)
-    if installed != noErr || registered != noErr { NSLog("FocusGuard: hot key not available (install \(installed), register \(registered))") }
-    return installed == noErr && registered == noErr
+    let registered = RegisterEventHotKey(key.code, key.modifiers, EventHotKeyID(signature: OSType(0x46474B59), id: 1),
+                                         GetApplicationEventTarget(), 0, &ref)
+    hotKeyRef = ref
+    if !hotKeyHandler || registered != noErr { NSLog("FocusGuard: hot key \(key.label) not available (register \(registered))") }
+    return hotKeyHandler && registered == noErr
 }
 
 /// Our own status item and the panel anchored under it. Replaces MenuBarExtra, which cannot be made
@@ -85,7 +120,10 @@ final class PanelController: NSObject {
             DispatchQueue.main.async { self?.updateStatusItem() }
         }.store(in: &bag)
         Bubble.anchorFrame = { [weak self] in self?.item.button?.window?.frame }
-        if !quiet { model.hotKeyTaken = !registerHotKey { [weak self] in self?.toggle() } }
+        if !quiet {
+            model.applyHotKey = { [weak self] in registerHotKey($0) { self?.toggle() } }
+            if !model.applyHotKey(model.hotKey) { model.hotKeyTaken = model.hotKey.label }
+        }
         // "bigger panel": resize the window around the scaled scene, keeping it under the icon.
         model.$largePanel.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async {
@@ -204,6 +242,10 @@ final class PanelController: NSObject {
     /// Space, Esc, ⌘Q and ⌘, while the panel has the keyboard. Returns true when the event is used.
     private func handle(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if model.recordingShortcut { // the settings note waits for the new shortcut; Esc keeps the old one
+            if event.keyCode == 53 { model.recordingShortcut = false } else if let key = HotKey(event) { model.setHotKey(key) }
+            return true
+        }
         if event.keyCode == 48 { model.usingKeyboard = true; return false } // tab or shift-tab: let SwiftUI move the focus
         if flags == .command {
             switch event.charactersIgnoringModifiers {

@@ -33,8 +33,14 @@ final class AppModel: ObservableObject {
     var noteOpen: Bool { showSettings || showMusic || showTodos }
     /// Today's tasks, kept until the user clears the done ones.
     @Published var todos: [Todo] { didSet { save() } }
-    /// ⌃⌥⌘F could not be registered (another app owns it); the settings note says so.
-    @Published var hotKeyTaken = false
+    /// The shortcut that opens the desk from anywhere; the settings note can change it.
+    @Published var hotKey: HotKey { didSet { save() } }
+    /// The settings note waits for a new shortcut to be pressed.
+    @Published var recordingShortcut = false
+    /// A shortcut that could not be registered (another app owns it); the settings note says so.
+    @Published var hotKeyTaken: String?
+    /// Set by the panel controller: registers a shortcut in place of the current one, false when it is taken.
+    var applyHotKey: (HotKey) -> Bool = { _ in true }
     /// The card's × put it away for a clean room; a click on the clock brings it back.
     @Published var cardHidden = false
     /// Explains the camera on the card before the system prompt shows (first session only).
@@ -138,6 +144,9 @@ final class AppModel: ObservableObject {
         largePanel = d.object(forKey: "largePanel") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
+        hotKey = (d.object(forKey: "hotKeyCode") as? Int).map {
+            HotKey(code: UInt32($0), modifiers: UInt32(d.integer(forKey: "hotKeyModifiers")), label: d.string(forKey: "hotKeyLabel") ?? "")
+        } ?? .standard
         seenTour = d.object(forKey: "seenTour") as? Bool ?? d.bool(forKey: "seenHint") // someone who has used the app already knows the desk
         todos = d.data(forKey: "todos").flatMap { try? JSONDecoder().decode([Todo].self, from: $0) } ?? []
         launchAtLogin = [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
@@ -301,6 +310,19 @@ final class AppModel: ObservableObject {
         if clock.phase.isRunning { togglePause() } else { requestStart() }
     }
 
+    /// A new shortcut from the settings note. If another app has it, the old one stays and the note says why.
+    func setHotKey(_ key: HotKey) {
+        recordingShortcut = false
+        guard key != hotKey else { return }
+        if applyHotKey(key) {
+            hotKey = key
+            hotKeyTaken = nil
+        } else {
+            hotKeyTaken = key.label
+            _ = applyHotKey(hotKey)
+        }
+    }
+
     func toggleSettings() {
         showSettings.toggle()
     }
@@ -344,6 +366,7 @@ final class AppModel: ObservableObject {
         showMusic = false
         showTodos = false
         showCameraWhy = false
+        recordingShortcut = false
         updateRainSound()
     }
 
@@ -490,6 +513,9 @@ final class AppModel: ObservableObject {
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")
         d.set(seenTour, forKey: "seenTour")
+        d.set(Int(hotKey.code), forKey: "hotKeyCode")
+        d.set(Int(hotKey.modifiers), forKey: "hotKeyModifiers")
+        d.set(hotKey.label, forKey: "hotKeyLabel")
         d.set(try? JSONEncoder().encode(todos), forKey: "todos")
     }
 }

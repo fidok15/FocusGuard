@@ -24,7 +24,7 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 ## Features
 
 ### The desk
-- **Lives in the menu bar.** No Dock icon and no window of its own. Click the menu bar icon, or press **⌃⌥⌘F** anywhere, to open the desk.
+- **Lives in the menu bar.** No Dock icon and no window of its own. Click the menu bar icon, or press **⌃⌥⌘F** anywhere, to open the desk. You can pick another shortcut in the settings.
 - **The sky follows your clock.** The view outside the window changes with the time of day: morning, day, sunset and night.
 - **Or let it rain.** Tick **rain outside** in the settings for a rainy evening room all day, with rain falling past the cat and a quiet rain sound. Both the sound and the falling rain can be turned off on their own.
 - **Everything on the desk does something.** The first time you open the desk, every object you can click is outlined for a moment. Hover over an object to see its outline, then click it:
