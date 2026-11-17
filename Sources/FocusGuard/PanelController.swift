@@ -157,7 +157,12 @@ final class PanelController: NSObject {
             panel.makeKeyAndOrderFront(nil)
             if let clickMonitor { NSEvent.removeMonitor(clickMonitor) } // show() twice must not leak a monitor
             clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-                Task { @MainActor in self?.hide() }
+                Task { @MainActor in
+                    // The status item's own clicks also arrive here (the menu bar draws it in another process);
+                    // hiding on its mouse-down would let its mouse-up open the panel again, from scratch.
+                    guard let self, self.item.button?.window?.frame.contains(NSEvent.mouseLocation) != true else { return }
+                    self.hide()
+                }
             }
         }
     }
