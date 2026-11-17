@@ -62,9 +62,11 @@ struct PencilX: View {
             .frame(width: 8, height: 8)
             .padding(6)
             .overlay { LooseEllipse(seed: 7).trim(from: 0, to: hover.value ? 1 : 0.82).stroke(Ink.pencil.opacity(0.7), lineWidth: 0.9) }
+            .padding(2) // a 24 × 24 target around the 20 pt circle
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .padding(-2)
         .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.18), value: hover.value)
@@ -399,10 +401,11 @@ struct TodoNote: View {
                             .stroke(Ink.pencil, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
                             .frame(width: 9, height: 9)
                     }
-                    .padding(4)
+                    .padding(7.5) // a 24 × 24 target around the small box
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressStyle())
+            .padding(-3.5) // laid out as before
             .pencilFocus(action)
             .accessibilityLabel(Text(done ? "done" : "not done"))
             .padding(-4)

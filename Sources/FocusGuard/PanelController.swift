@@ -121,6 +121,8 @@ final class PanelController: NSObject {
         for (title, selector, enabled) in [
             (running ? (model.clock.isPaused ? "Resume" : "Pause") : "Start session", #selector(menuStartPause), true),
             ("Stop session", #selector(menuStop), running),
+            ("Tasks", #selector(menuTasks), true),
+            ("Music", #selector(menuMusic), true),
             ("Settings", #selector(menuSettings), true),
         ] {
             let entry = menu.addItem(withTitle: NSLocalizedString(title, comment: ""), action: selector, keyEquivalent: "")
@@ -142,6 +144,16 @@ final class PanelController: NSObject {
     }
 
     @objc private func menuStop() { model.stop() }
+
+    @objc private func menuTasks() {
+        if !isOpen { show() }
+        model.showTodos = true
+    }
+
+    @objc private func menuMusic() {
+        if !isOpen { show() }
+        if !model.showMusic { model.toggleMusic() }
+    }
 
     @objc private func menuSettings() {
         if !isOpen { show() }

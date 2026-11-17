@@ -196,10 +196,11 @@ struct PencilTap: View {
                     Scribble().trim(from: 0, to: hover.value ? 1 : 0)
                         .stroke(Ink.pencil.opacity(0.75), lineWidth: 0.9).frame(width: 9, height: 2.5).offset(y: 1)
                 }
-                .padding(.horizontal, 4).padding(.vertical, 2) // a 21 × 21 target around the small glyph
+                .padding(.horizontal, 5.5).padding(.vertical, 3.5) // a 24 × 24 target around the small glyph
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .padding(-1.5) // laid out at 21 × 21 as before, so the rows keep their spacing
         .pencilFocus(action)
         .onHover { hover.value = $0 }
         .animation(.easeOut(duration: 0.18), value: hover.value)
