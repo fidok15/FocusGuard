@@ -176,17 +176,13 @@ final class Spotify: ObservableObject {
         parts.queryItems = [URLQueryItem(name: "url", value: id)]
         guard let url = parts.url else { return }
         lookingUp = id
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            let found = data.flatMap(NowPlaying.oembedThumbnail)
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard self.lookingUp == id, self.trackID == id else { return }
-                    guard let found else { self.lookingUp = nil; return } // failed: the next change tries again
-                    self.track?.artworkURL = found
-                    self.loadArtwork()
-                }
-            }
-        }.resume()
+        Task {
+            let found = await Self.download(url, limit: 64 << 10).flatMap(NowPlaying.oembedThumbnail)
+            guard lookingUp == id, trackID == id else { return }
+            guard let found else { lookingUp = nil; return } // failed: the next change tries again
+            track?.artworkURL = found
+            loadArtwork()
+        }
     }
 
     /// The cover is the one thing the app fetches: Spotify's own image server, over https (NowPlaying checks the host).
@@ -195,17 +191,31 @@ final class Spotify: ObservableObject {
         guard url != artworkURL else { return }
         artwork = nil // the old cover never sits next to the new song while this one loads
         artworkURL = url
-        URLSession.shared.dataTask(with: url) { data, response, _ in
-            let ok = (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
-            let image = ok ? data.flatMap(NSImage.init(data:)) : nil
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard self.artworkURL == url else { return }
-                    self.artwork = image
-                    if image == nil { self.artworkURL = nil } // failed: the next refresh tries again
-                }
+        Task {
+            let image = await Self.download(url, limit: 2 << 20).flatMap(NSImage.init(data:))
+            guard artworkURL == url else { return }
+            artwork = image
+            if image == nil { artworkURL = nil } // failed: the next refresh tries again
+        }
+    }
+
+    /// No cookies or cache, and a redirect may not leave Spotify's hosts.
+    private nonisolated static let session = URLSession(configuration: .ephemeral, delegate: SpotifyHostsOnly(), delegateQueue: nil)
+
+    /// A 2xx body of at most `limit` bytes, or nil. Stops reading as soon as the body grows past the limit.
+    private nonisolated static func download(_ url: URL, limit: Int) async -> Data? {
+        guard NowPlaying.allowedDownload(url),
+              let (bytes, response) = try? await session.bytes(from: url),
+              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              http.expectedContentLength <= Int64(limit) else { return nil }
+        var data = Data()
+        do {
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > limit { return nil }
             }
-        }.resume()
+        } catch { return nil }
+        return data
     }
 
     // MARK: AppleScript, only ever run on `queue`
@@ -246,5 +256,13 @@ final class Spotify: ObservableObject {
         let result = NSAppleScript(source: source)?.executeAndReturnError(&error)
         if let error { NSLog("FocusGuard: Spotify script failed: \(error)") }
         return error == nil ? result?.stringValue : nil
+    }
+}
+
+/// Follows a redirect only to another Spotify host; otherwise the 3xx itself is the answer, which `download` rejects.
+private final class SpotifyHostsOnly: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        request.url.map(NowPlaying.allowedDownload) == true ? request : nil
     }
 }

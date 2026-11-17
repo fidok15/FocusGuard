@@ -30,6 +30,11 @@ public struct NowPlaying: Equatable, Sendable {
         return host.hasSuffix(".scdn.co") || host.hasSuffix(".spotifycdn.com") ? url : nil
     }
 
+    /// Where a download may go, redirects included: the cover servers, and open.spotify.com for the oEmbed lookup.
+    public static func allowedDownload(_ url: URL) -> Bool {
+        spotifyImage(url) != nil || (url.scheme == "https" && url.host == "open.spotify.com")
+    }
+
     /// The cover link from Spotify's oEmbed reply (open.spotify.com/oembed), for when AppleScript gives none.
     public static func oembedThumbnail(_ data: Data) -> URL? {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
