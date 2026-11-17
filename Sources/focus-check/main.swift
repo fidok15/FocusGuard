@@ -306,6 +306,51 @@ func undoStopCarriesOn() {
     check(clock.phase == .idle && clock.studied(at: t0 + 40 * 60) == 0)
 }
 
+func skipBreakStartsNextRound() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 4), at: t0)
+    clock.skipBreak(at: t0 + 60) // only breaks can be skipped
+    check(clock.phase == .study(round: 1))
+    clock.tick(at: t0 + 26 * 60)
+    clock.pause(at: t0 + 26 * 60)
+    clock.skipBreak(at: t0 + 27 * 60)
+    check(clock.phase == .study(round: 2) && !clock.isPaused)
+    check(clock.remaining(at: t0 + 27 * 60) == 25 * 60)
+    check(clock.studied(at: t0 + 30 * 60) == 28 * 60)
+}
+
+func extendAddsFiveMinutes() {
+    var clock = SessionClock()
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 4), at: t0)
+    clock.extend(by: 5 * 60, at: t0 + 20 * 60)
+    check(clock.remaining(at: t0 + 20 * 60) == 10 * 60)
+    clock.tick(at: t0 + 26 * 60)
+    check(clock.phase == .study(round: 1))
+    clock.pause(at: t0 + 26 * 60)
+    clock.extend(by: 5 * 60, at: t0 + 40 * 60) // paused: stays paused, with 5 more minutes
+    check(clock.isPaused && clock.remaining(at: t0 + 50 * 60) == 9 * 60)
+    clock.resume(at: t0 + 50 * 60)
+    clock.tick(at: t0 + 59 * 60)
+    check(clock.phase == .rest(round: 1) && clock.studied(at: t0 + 59 * 60) == 35 * 60)
+    clock.extend(by: 5 * 60, at: t0 + 60 * 60)
+    check(clock.remaining(at: t0 + 60 * 60) == 9 * 60 && !clock.isLongBreak)
+}
+
+func waitAfterBreakHoldsNextRound() {
+    var clock = SessionClock()
+    clock.waitAfterBreak = true
+    let t0 = Date(timeIntervalSinceReferenceDate: 0)
+    clock.start(SessionConfig(studyMinutes: 25, breakMinutes: 5, rounds: 4), at: t0)
+    clock.tick(at: t0 + 10 * 3600) // asleep for hours: still waits at the start of round 2
+    check(clock.phase == .study(round: 2) && clock.isPaused)
+    check(clock.remaining(at: t0 + 10 * 3600) == 25 * 60 && clock.studied(at: t0 + 10 * 3600) == 25 * 60)
+    clock.resume(at: t0 + 11 * 3600)
+    clock.tick(at: t0 + 11 * 3600 + 25 * 60)
+    check(clock.phase == .rest(round: 2))
+}
+
 func lcdDigitsAndText() {
     check(SevenSegment.mask(8) == 0b1111111)
     check(SevenSegment.mask(1) == 0b0000110)
@@ -399,6 +444,9 @@ let checks: [(String, () -> Void)] = [
     ("fullSessionStudiedExcludesBreaks", fullSessionStudiedExcludesBreaks),
     ("stopRightAfterStartGoesIdle", stopRightAfterStartGoesIdle),
     ("undoStopCarriesOn", undoStopCarriesOn),
+    ("skipBreakStartsNextRound", skipBreakStartsNextRound),
+    ("extendAddsFiveMinutes", extendAddsFiveMinutes),
+    ("waitAfterBreakHoldsNextRound", waitAfterBreakHoldsNextRound),
 ]
 for (name, body) in checks {
     current = name

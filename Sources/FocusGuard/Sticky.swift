@@ -159,6 +159,7 @@ struct SettingsNote: View {
                     BoxChoice(title: "camera preview", checked: model.showPreview, size: 12) { model.showPreview.toggle() }
                 }
                 BoxChoice(title: "sounds", checked: model.soundsOn, size: 12) { model.soundsOn.toggle() }
+                BoxChoice(title: "wait for me after breaks", checked: model.waitForMe, size: 12) { model.waitForMe.toggle() }
                 BoxChoice(title: "bigger panel", checked: model.largePanel, size: 12) { model.largePanel.toggle() }
                 BoxChoice(title: "launch at login", checked: model.launchAtLogin, size: 12) { model.launchAtLogin.toggle() }
                 if model.loginApproval {

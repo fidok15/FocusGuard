@@ -106,3 +106,7 @@
 "not done" = "do zrobienia";
 "stopped" = "zatrzymano";
 "round %lld of %lld" = "runda %lld z %lld";
+"+5 min" = "+5 min";
+"five more minutes" = "jeszcze pięć minut";
+"skip break" = "pomiń przerwę";
+"wait for me after breaks" = "czekaj na mnie po przerwie";
