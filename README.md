@@ -26,6 +26,7 @@ Click the timer icon and a hand-drawn desk opens under it: a window onto the tow
 ### The desk
 - **Lives in the menu bar.** No Dock icon and no window of its own. Click the menu bar icon, or press **⌃⌥⌘F** anywhere, to open the desk.
 - **The sky follows your clock.** The view outside the window changes with the time of day: morning, day, sunset and night.
+- **Or let it rain.** Tick **rain outside** in the settings for a rainy evening room all day, with rain falling past the cat and a quiet rain sound. Both the sound and the falling rain can be turned off on their own.
 - **Everything on the desk does something.** Hover over an object to see its outline, then click it:
 
   | Object | What it does |
@@ -145,3 +146,5 @@ Pushing a `v*` tag that matches the version in `Resources/Info.plist` builds the
 ## License
 
 [MIT](LICENSE)
+
+The rain sound is a public domain recording by ezwa ([PDSounds via Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Rain_(1).ogg)), cut to a 30 second loop.

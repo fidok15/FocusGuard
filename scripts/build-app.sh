@@ -12,7 +12,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
 cp "$(swift build -c release $arch --show-bin-path)/FocusGuard" "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/"
-cp Resources/AppIcon.icns "$app/Contents/Resources/"
+cp Resources/AppIcon.icns Resources/rain.m4a "$app/Contents/Resources/"
 cp -R Resources/en.lproj Resources/pl.lproj "$app/Contents/Resources/"
 # The scenes are already 2000 px wide RGBA PNGs (transparent cut-out), so they ship as they are.
 for scene in morning day sunset night rain; do

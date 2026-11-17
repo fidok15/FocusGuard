@@ -33,7 +33,7 @@ struct RainFall: View {
     }
 }
 
-/// Soft rain made on the fly, so no audio file ships: band-passed noise for the wash and short random ticks for the drops.
+/// A 30 s rain recording looped without a seam (public domain, see the README credits).
 @MainActor
 final class RainSound {
     private var engine: AVAudioEngine?
@@ -46,50 +46,20 @@ final class RainSound {
         }
     }
 
-    private nonisolated static func makeEngine() -> AVAudioEngine? {
+    private static func makeEngine() -> AVAudioEngine? {
+        let dev = URL(fileURLWithPath: "Resources/rain.m4a") // `swift run` from the repo root
+        guard let url = Bundle.main.url(forResource: "rain", withExtension: "m4a") ?? (FileManager.default.fileExists(atPath: dev.path) ? dev : nil),
+              let file = try? AVAudioFile(forReading: url),
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil else { return nil }
         let engine = AVAudioEngine()
-        let rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate > 0 ? rate : 44100, channels: 2) else { return nil }
-        let synth = RainSynth(rate: Float(format.sampleRate))
-        let source = AVAudioSourceNode(format: format) { _, _, frames, list in
-            synth.render(Int(frames), into: UnsafeMutableAudioBufferListPointer(list))
-            return noErr
-        }
-        engine.attach(source)
-        engine.connect(source, to: engine.mainMixerNode, format: format)
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+        engine.connect(player, to: engine.mainMixerNode, format: buffer.format)
+        player.volume = 0.6
+        player.scheduleBuffer(buffer, at: nil, options: .loops) // a whole buffer loops gaplessly, unlike a compressed file
         do { try engine.start() } catch { return nil }
+        player.play()
         return engine
-    }
-}
-
-/// Runs on the audio thread only.
-private final class RainSynth: @unchecked Sendable {
-    private var seed: UInt64 = 0x9E37_79B9_7F4A_7C15
-    private var high: [Float] = [0, 0], low: [Float] = [0, 0], drop: [Float] = [0, 0], last: [Float] = [0, 0]
-    private let dropChance: Float, dropDecay: Float
-
-    init(rate: Float) {
-        dropChance = 45 / rate // drops per second, per ear
-        dropDecay = exp(-1 / (0.006 * rate))
-    }
-
-    private func random() -> Float {
-        seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17
-        return Float(seed >> 40) / Float(1 << 24)
-    }
-
-    func render(_ frames: Int, into buffers: UnsafeMutableAudioBufferListPointer) {
-        for c in 0..<min(2, buffers.count) {
-            guard let out = buffers[c].mData?.assumingMemoryBound(to: Float.self) else { continue }
-            for i in 0..<frames {
-                let white = random() * 2 - 1
-                high[c] += 0.25 * (white - high[c]) // ~1.8 kHz low-pass
-                low[c] += 0.02 * (white - low[c]) // ~140 Hz: what is left between them is the wash
-                if random() < dropChance { drop[c] = 0.3 + 0.7 * random() }
-                drop[c] *= dropDecay
-                out[i] = ((high[c] - low[c]) * 0.5 + (white - last[c]) * drop[c] * 0.25) * 0.3
-                last[c] = white
-            }
-        }
     }
 }
