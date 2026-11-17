@@ -85,8 +85,9 @@ final class AppModel: ObservableObject {
     var seenTour: Bool { didSet { save() } }
     /// After a break the next round waits for a click or space instead of starting by itself.
     @Published var waitForMe: Bool { didSet { save(); clock.waitAfterBreak = waitForMe } }
-    /// Draws the whole panel 25 % larger, for reading the hand-written text more easily.
-    @Published var largePanel: Bool { didSet { save() } }
+    /// How large the whole panel is drawn, 80–150 %, for reading the hand-written text more easily.
+    @Published var panelScale: CGFloat { didSet { save() } }
+    static let panelScales: ClosedRange<CGFloat> = 0.8...1.5
     @Published var launchAtLogin: Bool {
         didSet {
             guard !syncingLogin, launchAtLogin != oldValue else { return }
@@ -141,7 +142,8 @@ final class AppModel: ObservableObject {
         rain = d.object(forKey: "rain") as? Bool ?? false
         rainSound = d.object(forKey: "rainSound") as? Bool ?? true
         rainMotion = d.object(forKey: "rainMotion") as? Bool ?? true
-        largePanel = d.object(forKey: "largePanel") as? Bool ?? false
+        panelScale = (d.object(forKey: "panelScale") as? Double).map { CGFloat($0) }
+            ?? (d.bool(forKey: "largePanel") ? 1.25 : 1) // the old "bigger panel" setting
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
         hotKey = (d.object(forKey: "hotKeyCode") as? Int).map {
@@ -175,7 +177,6 @@ final class AppModel: ObservableObject {
     // MARK: Derived state
 
     var timeOfDay: TimeOfDay { timeOverride ?? (rain ? .rain : TimeOfDay(date: now)) }
-    var panelScale: CGFloat { largePanel ? 1.25 : 1 }
     var timeOverride: TimeOfDay?
     /// Which card is showing above the clock; changing it plays the card's enter motion.
     var cardKey: String {
@@ -509,7 +510,7 @@ final class AppModel: ObservableObject {
         d.set(rain, forKey: "rain")
         d.set(rainSound, forKey: "rainSound")
         d.set(rainMotion, forKey: "rainMotion")
-        d.set(largePanel, forKey: "largePanel")
+        d.set(Double(panelScale), forKey: "panelScale")
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")
         d.set(seenTour, forKey: "seenTour")

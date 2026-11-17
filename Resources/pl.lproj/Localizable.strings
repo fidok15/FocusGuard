@@ -64,7 +64,7 @@
 "focus history" = "historia skupienia";
 "on" = "włączone";
 "off" = "wyłączone";
-"bigger panel" = "większy panel";
+"panel size" = "rozmiar panelu";
 "%@ is used by another app" = "%@ zajęła inna aplikacja";
 "shortcut" = "skrót";
 "press keys…" = "naciśnij skrót…";
