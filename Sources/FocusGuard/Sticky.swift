@@ -160,6 +160,11 @@ struct SettingsNote: View {
                 }
                 BoxChoice(title: "sounds", checked: model.soundsOn, size: 12) { model.soundsOn.toggle() }
                 BoxChoice(title: "wait for me after breaks", checked: model.waitForMe, size: 12) { model.waitForMe.toggle() }
+                BoxChoice(title: "rain outside", checked: model.rain, size: 12) { model.rain.toggle() }
+                if model.rain {
+                    BoxChoice(title: "rain sound", checked: model.rainSound, size: 12) { model.rainSound.toggle() }.padding(.leading, 13)
+                    BoxChoice(title: "rain animation", checked: model.rainMotion, size: 12) { model.rainMotion.toggle() }.padding(.leading, 13)
+                }
                 BoxChoice(title: "bigger panel", checked: model.largePanel, size: 12) { model.largePanel.toggle() }
                 BoxChoice(title: "launch at login", checked: model.launchAtLogin, size: 12) { model.launchAtLogin.toggle() }
                 if model.loginApproval {

@@ -70,6 +70,10 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var soundsOn: Bool { didSet { save() } }
+    /// The rainy room instead of the time of day, with its sound and falling rain each switchable.
+    @Published var rain: Bool { didSet { save(); updateRainSound() } }
+    @Published var rainSound: Bool { didSet { save(); updateRainSound() } }
+    @Published var rainMotion: Bool { didSet { save() } }
     /// After a break the next round waits for a click or space instead of starting by itself.
     @Published var waitForMe: Bool { didSet { save(); clock.waitAfterBreak = waitForMe } }
     /// Draws the whole panel 25 % larger, for reading the hand-written text more easily.
@@ -95,6 +99,7 @@ final class AppModel: ObservableObject {
 
     let cameraService = CameraService()
     let spotify = Spotify()
+    private let rainPlayer = RainSound()
     /// Screens learned from where you look; kept for the whole app run, across study phases.
     private let zones = PoseZones()
     private var bag = Set<AnyCancellable>()
@@ -124,6 +129,9 @@ final class AppModel: ObservableObject {
         useCamera = d.object(forKey: "useCamera") as? Bool ?? true
         soundsOn = d.object(forKey: "soundsOn") as? Bool ?? true
         waitForMe = d.object(forKey: "waitForMe") as? Bool ?? false
+        rain = d.object(forKey: "rain") as? Bool ?? false
+        rainSound = d.object(forKey: "rainSound") as? Bool ?? true
+        rainMotion = d.object(forKey: "rainMotion") as? Bool ?? true
         largePanel = d.object(forKey: "largePanel") as? Bool ?? false
         seenHint = d.object(forKey: "seenHint") as? Bool ?? false
         cameraExplained = d.object(forKey: "cameraExplained") as? Bool ?? false
@@ -153,7 +161,7 @@ final class AppModel: ObservableObject {
 
     // MARK: Derived state
 
-    var timeOfDay: TimeOfDay { timeOverride ?? TimeOfDay(date: now) }
+    var timeOfDay: TimeOfDay { timeOverride ?? (rain ? .rain : TimeOfDay(date: now)) }
     var panelScale: CGFloat { largePanel ? 1.25 : 1 }
     var timeOverride: TimeOfDay?
     /// Which card is showing above the clock; changing it plays the card's enter motion.
@@ -310,6 +318,7 @@ final class AppModel: ObservableObject {
         usingKeyboard = false
         syncLogin()
         spotify.refresh(ask: false)
+        updateRainSound()
     }
 
     /// Launch at login can change behind our back (System Settings), so read it again whenever the panel opens.
@@ -326,6 +335,12 @@ final class AppModel: ObservableObject {
         showMusic = false
         showTodos = false
         showCameraWhy = false
+        updateRainSound()
+    }
+
+    /// The rain is heard while the room is on screen or a session counts down.
+    private func updateRainSound() {
+        rainPlayer.playing = rain && rainSound && (panelOpen || clock.phase.isRunning && !clock.isPaused)
     }
 
     func openCameraSettings() {
@@ -402,6 +417,7 @@ final class AppModel: ObservableObject {
             camera = .off
             calibrating = false
         }
+        updateRainSound()
         if clock.phase.isRunning, activity == nil {
             // Keeps App Nap from throttling the timer without blocking idle sleep.
             activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
@@ -458,6 +474,9 @@ final class AppModel: ObservableObject {
         d.set(useCamera, forKey: "useCamera")
         d.set(soundsOn, forKey: "soundsOn")
         d.set(waitForMe, forKey: "waitForMe")
+        d.set(rain, forKey: "rain")
+        d.set(rainSound, forKey: "rainSound")
+        d.set(rainMotion, forKey: "rainMotion")
         d.set(largePanel, forKey: "largePanel")
         d.set(seenHint, forKey: "seenHint")
         d.set(cameraExplained, forKey: "cameraExplained")

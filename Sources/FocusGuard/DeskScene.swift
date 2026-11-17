@@ -103,7 +103,8 @@ struct SceneArt {
 }
 
 enum TimeOfDay: CaseIterable {
-    case morning, day, sunset, night
+    /// `rain` is not a time of day: the "rain outside" setting shows it all day.
+    case morning, day, sunset, night, rain
 
     init(date: Date) {
         switch Calendar.current.component(.hour, from: date) {
@@ -115,7 +116,7 @@ enum TimeOfDay: CaseIterable {
     }
 
     var art: SceneArt { Self.arts[self]! }
-    var props: Props { self == .day ? .day : self == .sunset ? .sunset : .morning }
+    var props: Props { self == .day || self == .rain ? .day : self == .sunset ? .sunset : .morning } // the rain art was drawn over the day scene
 
     private static let arts: [TimeOfDay: SceneArt] = [
         .morning: SceneArt(url: SceneArt.locate("scene_morning"), silhouette: Silhouette.catMorning,
@@ -126,6 +127,8 @@ enum TimeOfDay: CaseIterable {
                           head: CGPoint(x: 1660, y: 655), headRadius: 52),
         .night: SceneArt(url: SceneArt.locate("scene_night"), silhouette: Silhouette.catNight,
                          head: CGPoint(x: 1525, y: 858), headRadius: 60),
+        .rain: SceneArt(url: SceneArt.locate("scene_rain"), silhouette: Silhouette.catRain,
+                        head: CGPoint(x: 1166, y: 412), headRadius: 44),
     ]
 }
 
@@ -188,6 +191,8 @@ struct DeskScene: View {
             .id(tod)
             .transition(.opacity)
 
+            if tod == .rain && model.rainMotion && !calmMotion { RainFall().allowsHitTesting(false) } // behind the cat
+
             // A click on the room, away from the objects (they sit above this), puts the card away like its ×.
             if !model.cardHidden && model.cardKey != "why" {
                 Color.black.opacity(0.001).frame(width: W, height: H).onTapGesture { model.cardHidden = true }
@@ -218,7 +223,8 @@ struct DeskScene: View {
             if model.showSettings {
                 Color.black.opacity(0.001).onTapGesture { model.showSettings = false }
                 SettingsNote()
-                    .position(x: 128, y: 146) // room above for the extra red lines (login, hot key)
+                    .frame(height: 340, alignment: .top) // pinned at the top: new lines grow it down over the desk
+                    .position(x: 128, y: 190)
                     .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
 
