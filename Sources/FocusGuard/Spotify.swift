@@ -79,7 +79,7 @@ final class Spotify: ObservableObject {
             if !sameTrack { dropArtwork() } // never show the last album's cover next to a new song
             trackID = info["Track ID"] as? String
             track = t
-            loadArtwork()
+            if access != .granted { loadArtwork() } // otherwise the read below brings the cover link at once, no oEmbed wait
         }
         refresh(ask: false)
     }
@@ -96,16 +96,16 @@ final class Spotify: ObservableObject {
                 MainActor.assumeIsolated {
                     self.note(status)
                     // Spotify may have quit, or moved on to another track, while this was read.
-                    guard status == noErr, self.running, started == self.generation else { return }
+                    guard self.running, started == self.generation else { return }
                     // A read without a track is what Spotify 1.3 always answers: keep what the notification said.
-                    if let reply, var read = NowPlaying.parse(reply) {
+                    if status == noErr, let reply, var read = NowPlaying.parse(reply) {
                         if Date().timeIntervalSince(self.setAt) < 2, let old = self.track {
                             read.shuffling = old.shuffling
                             read.repeating = old.repeating
                         }
                         self.track = read
-                        self.loadArtwork()
                     }
+                    self.loadArtwork() // no cover link in the read: oEmbed
                 }
             }
         }
@@ -179,14 +179,14 @@ final class Spotify: ObservableObject {
 
     /// Spotify 1.3's AppleScript gives no cover link, so ask Spotify's oEmbed endpoint for the track's thumbnail.
     private func lookUpArtwork() {
-        guard let id = trackID, id.hasPrefix("spotify:track:"), lookingUp != id,
+        guard track?.artworkURL == nil, let id = trackID, id.hasPrefix("spotify:track:"), lookingUp != id,
               var parts = URLComponents(string: "https://open.spotify.com/oembed") else { return }
         parts.queryItems = [URLQueryItem(name: "url", value: id)]
         guard let url = parts.url else { return }
         lookingUp = id
         Task {
             let found = await Self.download(url, limit: 64 << 10).flatMap(NowPlaying.oembedThumbnail)
-            guard lookingUp == id, trackID == id else { return }
+            guard lookingUp == id, trackID == id, track?.artworkURL == nil else { return } // a read got there first
             guard let found else { lookingUp = nil; return } // failed: the next change tries again
             track?.artworkURL = found
             loadArtwork()
@@ -210,19 +210,13 @@ final class Spotify: ObservableObject {
     /// No cookies or cache, and a redirect may not leave Spotify's hosts.
     private nonisolated static let session = URLSession(configuration: .ephemeral, delegate: SpotifyHostsOnly(), delegateQueue: nil)
 
-    /// A 2xx body of at most `limit` bytes, or nil. Stops reading as soon as the body grows past the limit.
+    /// A 2xx body of at most `limit` bytes, or nil. Reading byte by byte took ~1 s per cover, so the body comes whole.
+    // ponytail: no mid-stream cut-off; the hosts are Spotify's own, re-add a chunked reader if that ever changes.
     private nonisolated static func download(_ url: URL, limit: Int) async -> Data? {
         guard NowPlaying.allowedDownload(url),
-              let (bytes, response) = try? await session.bytes(from: url),
+              let (data, response) = try? await session.data(from: url),
               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-              http.expectedContentLength <= Int64(limit) else { return nil }
-        var data = Data()
-        do {
-            for try await byte in bytes {
-                data.append(byte)
-                if data.count > limit { return nil }
-            }
-        } catch { return nil }
+              data.count <= limit else { return nil }
         return data
     }
 
