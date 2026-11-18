@@ -27,6 +27,8 @@ final class Spotify: ObservableObject {
     private var trackID: String?
     /// Bumped when a notification or Spotify quitting replaces the track, so a read started earlier cannot bring the old one back.
     private var generation = 0
+    /// Spotify reads shuffle / repeat back about a second late, so a read just after we set them keeps ours.
+    private var setAt = Date.distantPast
 
     nonisolated private static var isRunning: Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
@@ -83,21 +85,24 @@ final class Spotify: ObservableObject {
     }
 
     /// Reads the player through AppleScript. With `ask`, macOS may show its Automation prompt; without it,
-    /// nothing is read until the user has allowed it once.
+    /// nothing is read until a script has gone through once this launch.
+    /// No AEDeterminePermissionToAutomateTarget: on macOS 27 it can block forever, and every control queued behind it.
     func refresh(ask: Bool) {
-        guard running else { return }
+        guard running, ask || access == .granted else { return }
         let started = generation
         queue.async {
-            let allowed = Self.permission(ask: ask)
-            let reply = allowed == noErr ? Self.run(Self.readScript) : nil
+            let (reply, status) = Self.run(Self.readScript)
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    if allowed == OSStatus(errAEEventNotPermitted) { self.access = .denied }
+                    self.note(status)
                     // Spotify may have quit, or moved on to another track, while this was read.
-                    guard allowed == noErr, self.running, started == self.generation else { return }
-                    self.access = .granted
+                    guard status == noErr, self.running, started == self.generation else { return }
                     // A read without a track is what Spotify 1.3 always answers: keep what the notification said.
-                    if let reply, let read = NowPlaying.parse(reply) {
+                    if let reply, var read = NowPlaying.parse(reply) {
+                        if Date().timeIntervalSince(self.setAt) < 2, let old = self.track {
+                            read.shuffling = old.shuffling
+                            read.repeating = old.repeating
+                        }
                         self.track = read
                         self.loadArtwork()
                     }
@@ -120,21 +125,24 @@ final class Spotify: ObservableObject {
             let on = !(track?.shuffling ?? false)
             track?.shuffling = on
             script = "set shuffling to \(on)"
+            setAt = Date()
         case .repeat:
             let on = !(track?.repeating ?? false)
             track?.repeating = on
             script = "set repeating to \(on)"
+            setAt = Date()
         }
         queue.async {
-            let allowed = Self.permission(ask: true)
-            guard allowed == noErr else {
-                let denied = allowed == OSStatus(errAEEventNotPermitted) // otherwise Spotify just quit
-                DispatchQueue.main.async { MainActor.assumeIsolated { if denied { self.access = .denied } } }
-                return
-            }
-            _ = Self.run(Self.whileRunning(script))
+            let (_, status) = Self.run(Self.whileRunning(script))
+            DispatchQueue.main.async { MainActor.assumeIsolated { self.note(status) } }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { MainActor.assumeIsolated { self.refresh(ask: false) } }
         }
+    }
+
+    /// What a script's result says about the Automation permission; other errors (Spotify quitting, a timeout) say nothing.
+    private func note(_ status: OSStatus) {
+        if status == noErr { access = .granted }
+        if status == OSStatus(errAEEventNotPermitted) { access = .denied }
     }
 
     func openSpotify() {
@@ -244,18 +252,13 @@ final class Spotify: ObservableObject {
         """
     }
 
-    /// noErr when allowed; errAEEventNotPermitted when the user said no; errAEEventWouldRequireUserConsent when not asked yet.
-    nonisolated private static func permission(ask: Bool) -> OSStatus {
-        let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
-        guard let desc = target.aeDesc else { return OSStatus(procNotFound) }
-        return AEDeterminePermissionToAutomateTarget(desc, typeWildCard, typeWildCard, ask)
-    }
-
-    nonisolated private static func run(_ source: String) -> String? {
+    /// The script's text result and its error number (noErr when it ran; errAEEventNotPermitted when the user said no).
+    nonisolated private static func run(_ source: String) -> (String?, OSStatus) {
         var error: NSDictionary?
         let result = NSAppleScript(source: source)?.executeAndReturnError(&error)
-        if let error { NSLog("FocusGuard: Spotify script failed: \(error)") }
-        return error == nil ? result?.stringValue : nil
+        guard let error else { return (result?.stringValue, noErr) }
+        NSLog("FocusGuard: Spotify script failed: \(error)")
+        return (nil, OSStatus((error[NSAppleScript.errorNumber] as? Int) ?? -1))
     }
 }
 
